@@ -9,7 +9,7 @@ export default function Login() {
 
   const handleLogin = async () => {
     try {
-      await axios.post(`${import.meta.env.BACKEND_URL}/auth/login`, { token }, { withCredentials: true });
+      await axios.post(`${import.meta.env.VITE_BACKEND_URL}/auth/login`, { token }, { withCredentials: true });
       navigate('/control');
     } catch (err) {
       setError('Invalid token');
