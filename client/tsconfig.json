@@ -1,0 +1,16 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" }
+  ],
+  "compilerOptions": {
+        "baseUrl": "./src", // Set the base directory for module resolution
+        "paths": {
+          "@/*": ["/*"], // Map @/components to the actual path
+          "@/pages/*": ["pages/*"], // Map @/components to the actual path
+          "@/components/*": ["components/*"], // Map @/components to the actual path
+          "@/utils/*": ["utils/*"] // Map @/utils to the actual path
+        }
+      }
+}
