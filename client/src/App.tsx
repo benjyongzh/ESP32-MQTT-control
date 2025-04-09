@@ -1,7 +1,8 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter,Routes, Route, Navigate } from 'react-router-dom';
 import './App.css'
 import Login from './pages/Login';
 import Control from './pages/Control';
+import ProtectedRoute from './pages/ProtectedRoute';
 
 function App() {
 
@@ -9,8 +10,9 @@ function App() {
 
     <BrowserRouter>
       <Routes>
+        <Route index element={<Navigate to="/login" replace />}/>
         <Route path="/login" element={<Login />} />
-        <Route path="/control" element={<Control />} />
+        <Route path="/control" element={<ProtectedRoute><Control /></ProtectedRoute>} />
       </Routes>
     </BrowserRouter>
   )
