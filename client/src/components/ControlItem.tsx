@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { MqttClient } from 'mqtt';
 
 enum EnumStatus {
-    LOW = "Status is currently Off",
-    HIGH = "Status is currently On",
-    SENDING = "⏳ Sending '${cmd}' command...",
+    LOW = "Off",
+    HIGH = "On",
+    SENDING = "",
 }
 
 export default function ControlItem(props: {client:MqttClient | null, topicControl:string, topicStatus:string}) {
@@ -36,7 +36,7 @@ export default function ControlItem(props: {client:MqttClient | null, topicContr
         <button className="bg-green-500 text-white px-6 py-2 rounded" onClick={() => toggleCommand()}>
           {status === EnumStatus.LOW ? "On" : status === EnumStatus.HIGH ? "Off" : "loading"}
         </button>
-      <p className="mt-4 text-lg">{status}</p>
+      <p className="mt-4 text-lg">{status === EnumStatus.LOW ? "Currently Off" : status === EnumStatus.HIGH ? "Currently On" : "⏳ Sending command..."}</p>
     </div>
   );
 }
