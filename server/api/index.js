@@ -17,6 +17,7 @@ app.use(cors({
 // Token verification middleware
 function authMiddleware(req, res, next) {
   const token = req.cookies[process.env.COOKIE_NAME];
+  console.log("token:", token);
   if (token === process.env.SHARED_TOKEN) {
     return next();
   } else {
@@ -31,7 +32,7 @@ app.post("/auth/login", (req, res) => {
     res.cookie(process.env.COOKIE_NAME, token, {
       httpOnly: true,
       secure: true,
-      sameSite: "strict",
+      sameSite: "none",
       maxAge: SESSION_TTL_MS
     });
     return res.json({ message: "Login successful" });
