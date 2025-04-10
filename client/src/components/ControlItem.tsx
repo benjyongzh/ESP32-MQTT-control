@@ -3,9 +3,10 @@ import { MqttClient } from "mqtt";
 import { mqttTopicId } from "../types";
 import { enumClientStatus } from "../pages/Control";
 
-enum EnumSwitchStatus {
+enum enumSwitchStatus {
   LOW = "Off",
   HIGH = "On",
+  SENDING = "Sending",
   UNKNOWN = "Unknown",
 }
 
@@ -16,8 +17,8 @@ export default function ControlItem(props: {
   topicStatus: mqttTopicId;
 }) {
   const { client, clientStatus, topicControl, topicStatus } = props;
-  const [status, setStatus] = useState<EnumSwitchStatus>(
-    EnumSwitchStatus.UNKNOWN
+  const [status, setStatus] = useState<enumSwitchStatus>(
+    enumSwitchStatus.UNKNOWN
   );
 
   useEffect(() => {
@@ -37,22 +38,34 @@ export default function ControlItem(props: {
         );
         if (topic === topicStatus) {
           const result: String = msg.toString();
-          setStatus(EnumSwitchStatus[result as keyof typeof EnumSwitchStatus]);
+          setStatus(enumSwitchStatus[result as keyof typeof enumSwitchStatus]);
         }
       });
     }
   }, [clientStatus]);
 
   const toggleCommand = () => {
-    if (clientStatus === enumClientStatus.CONNECTED) {
-      if (status === EnumSwitchStatus.LOW) {
-        client?.publish(topicControl, EnumSwitchStatus.HIGH, { retain: true });
-      } else if (status === EnumSwitchStatus.HIGH) {
-        client?.publish(topicControl, EnumSwitchStatus.LOW, { retain: true });
+    if (
+      clientStatus === enumClientStatus.CONNECTED ||
+      clientStatus === enumClientStatus.RECONNECTED
+    ) {
+      if (status === enumSwitchStatus.LOW) {
+        client?.publish(
+          topicControl,
+          enumSwitchStatus.HIGH,
+          { retain: true },
+          () => setStatus(enumSwitchStatus.SENDING)
+        );
+      } else if (status === enumSwitchStatus.HIGH) {
+        client?.publish(
+          topicControl,
+          enumSwitchStatus.LOW,
+          { retain: true },
+          () => setStatus(enumSwitchStatus.SENDING)
+        );
       }
-      setStatus(EnumSwitchStatus.UNKNOWN);
     } else {
-      setStatus(EnumSwitchStatus.UNKNOWN);
+      setStatus(enumSwitchStatus.UNKNOWN);
     }
   };
 
