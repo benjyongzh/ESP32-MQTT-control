@@ -15,7 +15,12 @@ export default function Control() {
     });
 
     mqttClient.on("connect", () => {
-      mqttClient.subscribe(import.meta.env.VITE_MQTT_TOPIC_STATUS);
+      console.log("mqttClient Connected");
+      topicItems.forEach((topic) => {
+        const topicStatus: string = getMqttTopicId(topic, "status");
+        console.log("subscribing to", topicStatus);
+        mqttClient.subscribe(topicStatus);
+      });
     });
 
     setClient(mqttClient);
