@@ -21,24 +21,27 @@ export default function ControlItem(props: {
   );
 
   useEffect(() => {
-    client?.on("connect", () => {
-      client.subscribe(topicStatus, { qos: 1 }, (err) => {
+    if (
+      clientStatus === enumClientStatus.CONNECTED ||
+      enumClientStatus.RECONNECTED
+    ) {
+      client?.subscribe(topicStatus, { qos: 1 }, (err) => {
         if (!err) {
           console.log("subscribing to", topicStatus);
+        } else console.log(`subcription error for ${topicStatus}`, err);
+      });
+
+      client?.on("message", (topic, msg) => {
+        console.log(
+          `Received message on topic ${topic}: ${msg}: ${msg.toString()}`
+        );
+        if (topic === topicStatus) {
+          const result: String = msg.toString();
+          setStatus(EnumSwitchStatus[result as keyof typeof EnumSwitchStatus]);
         }
       });
-    });
-
-    client?.on("message", (topic, msg) => {
-      console.log(
-        `Received message on topic ${topic}: ${msg}: ${msg.toString()}`
-      );
-      if (topic === topicStatus) {
-        const result: String = msg.toString();
-        setStatus(EnumSwitchStatus[result as keyof typeof EnumSwitchStatus]);
-      }
-    });
-  }, []);
+    }
+  }, [clientStatus]);
 
   const toggleCommand = () => {
     if (clientStatus === enumClientStatus.CONNECTED) {
