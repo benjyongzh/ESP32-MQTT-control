@@ -31,24 +31,26 @@ export default function Login() {
   return (
     <div className="base">
       <h1 className="text-2xl mb-4">Enter Shared Token</h1>
-      <Input
-        type="password"
-        placeholder="password"
-        value={token}
-        onChange={(e) => setToken(e.target.value)}
-      />
-      <Button
-        size="icon"
-        disabled={isLoading}
-        onClick={handleLogin}
-        className={isLoading ? "btn-disabled" : ""}
-      >
-        {isLoading ? (
-          <span className="loading loading-dots loading-md"></span>
-        ) : (
-          <ChevronRight />
-        )}
-      </Button>
+      <div className="flex items-center justify-center gap-4">
+        <Input
+          type="password"
+          placeholder="password"
+          value={token}
+          onChange={(e) => setToken(e.target.value)}
+        />
+        <Button
+          size="icon"
+          disabled={isLoading}
+          onClick={handleLogin}
+          className={isLoading ? "btn-disabled" : ""}
+        >
+          {isLoading ? (
+            <span className="loading loading-dots loading-md"></span>
+          ) : (
+            <ChevronRight />
+          )}
+        </Button>
+      </div>
 
       {error && (
         <Alert>

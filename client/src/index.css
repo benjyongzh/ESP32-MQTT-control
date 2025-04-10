@@ -53,14 +53,6 @@
   --sidebar-ring: oklch(0.704 0.04 256.788);
 }
 
-body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
-}
-
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -138,10 +130,10 @@ body {
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground min-h-screen min-w-full flex flex-col justify-start items-center m-0;
   }
 
-  base {
-    @apply flex flex-col items-center justify-center h-screen;
+  .base {
+    @apply flex flex-col items-center justify-center h-screen w-full max-w-xl;
   }
 }

@@ -7,7 +7,6 @@ import { getArrayOfTopicItems } from "../utils";
 import {
   Table,
   TableBody,
-  TableCaption,
   TableHead,
   TableHeader,
   TableRow,
@@ -64,8 +63,13 @@ export default function Control() {
   return (
     <div className="base">
       <h1 className="text-3xl mb-6">🌱 ESP32 Irrigation Control</h1>
+      <p className="mb-4 text-lg">
+        {clientStatus === enumClientStatus.CONNECTED ||
+        clientStatus === enumClientStatus.RECONNECTED
+          ? "✅ Connected to MQTT broker"
+          : "Connecting to MQTT..."}
+      </p>
       <Table>
-        <TableCaption>A list of valves</TableCaption>
         <TableHeader>
           <TableRow>
             <TableHead className="w-[100px]">Valve</TableHead>
@@ -83,12 +87,6 @@ export default function Control() {
           ))}
         </TableBody>
       </Table>
-      <p className="mt-4 text-lg">
-        {clientStatus === enumClientStatus.CONNECTED ||
-        clientStatus === enumClientStatus.RECONNECTED
-          ? "✅ Connected to MQTT broker"
-          : "Connecting to MQTT..."}
-      </p>
     </div>
   );
 }
