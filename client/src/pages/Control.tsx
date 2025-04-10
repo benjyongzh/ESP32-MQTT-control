@@ -2,11 +2,21 @@ import { useEffect, useMemo, useState } from "react";
 import mqtt, { MqttClient } from "mqtt";
 import ControlItem from "../components/ControlItem";
 import { TOPIC_LIST } from "../constants";
-import { mqttTopicItem, getMqttTopicId } from "../types";
+import { mqttTopicItem, getMqttTopicId, enumMqttTopicType } from "../types";
 import { getArrayOfTopicItems } from "../utils";
+
+export enum enumClientStatus {
+  CONNECTED = "Connected",
+  ERROR = "Error",
+  RECONNECTED = "Reconnected",
+  CLOSED = "Closed",
+}
 
 export default function Control() {
   const [client, setClient] = useState<MqttClient | null>(null);
+  const [clientStatus, setClientStatus] = useState<enumClientStatus>(
+    enumClientStatus.ERROR
+  );
 
   useEffect(() => {
     const mqttClient = mqtt.connect(import.meta.env.VITE_MQTT_CLUSTER_URL, {
@@ -14,16 +24,35 @@ export default function Control() {
       password: import.meta.env.VITE_MQTT_PASSWORD,
     });
 
+    setClient(mqttClient);
+
     mqttClient.on("connect", () => {
       console.log("mqttClient Connected");
       topicItems.forEach((topic) => {
-        const topicStatus: string = getMqttTopicId(topic, "status");
+        const topicStatus: string = getMqttTopicId(
+          topic,
+          enumMqttTopicType.STATUS
+        );
         console.log("subscribing to", topicStatus);
         mqttClient.subscribe(topicStatus);
       });
+      setClientStatus(enumClientStatus.CONNECTED);
     });
 
-    setClient(mqttClient);
+    mqttClient.on("error", () => {
+      console.log("mqttClient connection error");
+      setClientStatus(enumClientStatus.ERROR);
+    });
+
+    mqttClient.on("reconnect", () => {
+      console.log("mqttClient reconnected");
+      setClientStatus(enumClientStatus.RECONNECTED);
+    });
+
+    mqttClient.on("close", () => {
+      console.log("mqttClient connection closed");
+      setClientStatus(enumClientStatus.CLOSED);
+    });
   }, []);
 
   const topicItems: mqttTopicItem[] = useMemo(
@@ -38,13 +67,13 @@ export default function Control() {
         {topicItems.map((topic: mqttTopicItem) => (
           <ControlItem
             client={client}
-            topicControl={getMqttTopicId(topic, "control")}
-            topicStatus={getMqttTopicId(topic, "status")}
+            topicControl={getMqttTopicId(topic, enumMqttTopicType.CONTROL)}
+            topicStatus={getMqttTopicId(topic, enumMqttTopicType.STATUS)}
           />
         ))}
       </div>
       <p className="mt-4 text-lg">
-        {client !== null
+        {client?.connected
           ? "✅ Connected to MQTT broker"
           : "Connecting to MQTT..."}
       </p>

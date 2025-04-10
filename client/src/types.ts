@@ -7,14 +7,17 @@ export const makeMqttTopicItem = (
   return `${topicCategory}/${index}`;
 };
 
-export type mqttTopicType = "control" | "status";
+export enum enumMqttTopicType {
+  CONTROL = "control",
+  STATUS = "status",
+}
 
 export const getMqttTopicId = (
   topic: mqttTopicItem,
-  type: mqttTopicType
+  type: enumMqttTopicType
 ): mqttTopicId => {
   return `${topic}/${type}`;
 };
 
-export type mqttTopicId = `${mqttTopicItem}/${mqttTopicType}`;
+export type mqttTopicId = `${mqttTopicItem}/${enumMqttTopicType}`;
 // const id: mqttTopicId = 'irrigation/1/control';
