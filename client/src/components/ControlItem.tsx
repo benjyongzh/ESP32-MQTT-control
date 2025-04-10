@@ -1,8 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MqttClient } from "mqtt";
-import { mqttTopicId } from "../types";
+import {
+  mqttTopicId,
+  mqttTopicItem,
+  getMqttTopicId,
+  enumMqttTopicType,
+} from "../types";
 import { enumClientStatus } from "../pages/Control";
 import { getEnumKeyByEnumValue } from "../utils";
+import { TableCell, TableRow } from "@/components/ui/table";
+import { Switch } from "./ui/switch";
 
 enum enumSwitchStatus {
   LOW = "Off",
@@ -14,12 +21,20 @@ enum enumSwitchStatus {
 export default function ControlItem(props: {
   client: MqttClient | null;
   clientStatus: enumClientStatus;
-  topicControl: mqttTopicId;
-  topicStatus: mqttTopicId;
+  topicItem: mqttTopicItem;
 }) {
-  const { client, clientStatus, topicControl, topicStatus } = props;
+  const { client, clientStatus, topicItem } = props;
   const [status, setStatus] = useState<enumSwitchStatus>(
     enumSwitchStatus.UNKNOWN
+  );
+
+  const topicControl: mqttTopicId = useMemo(
+    () => getMqttTopicId(topicItem, enumMqttTopicType.CONTROL),
+    [topicItem]
+  );
+  const topicStatus: mqttTopicId = useMemo(
+    () => getMqttTopicId(topicItem, enumMqttTopicType.STATUS),
+    [topicItem]
   );
 
   useEffect(() => {
@@ -79,14 +94,17 @@ export default function ControlItem(props: {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center space-x-4">
-      <button
-        className="bg-green-500 text-white px-6 py-2 rounded"
-        onClick={() => toggleCommand()}
-      >
-        {status}
-      </button>
-      <p className="mt-4 text-lg">Currently {status}</p>
-    </div>
+    <TableRow key={topicItem}>
+      <TableCell className="font-medium">{topicItem}</TableCell>
+      <TableCell>{status}</TableCell>
+      <TableCell className="text-right">
+        <Switch
+          id={topicItem}
+          onCheckedChange={() => toggleCommand()}
+          checked={status === enumSwitchStatus.HIGH}
+          disabled={status === enumSwitchStatus.SENDING}
+        />
+      </TableCell>
+    </TableRow>
   );
 }

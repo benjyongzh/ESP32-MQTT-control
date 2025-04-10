@@ -5,14 +5,9 @@
     { "path": "./tsconfig.node.json" }
   ],
   "compilerOptions": {
-    "baseUrl": "./src", // Set the base directory for module resolution
+    "baseUrl": ".", // Set the base directory for module resolution
     "paths": {
-      "@/*": ["/*"], // Map @/components to the actual path
-      "@/pages/*": ["pages/*"], // Map @/components to the actual path
-      "@/components/*": ["components/*"], // Map @/components to the actual path
-      "@/utils/*": ["utils/*"] // Map @/utils to the actual path
-    },
-    "noUnusedLocals": false,
-    "noUnusedParameters": false
+      "@/*": ["./src/*"] // Map @/components to the actual path
+    }
   }
 }
