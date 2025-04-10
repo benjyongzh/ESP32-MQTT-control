@@ -28,9 +28,9 @@ export default function ControlItem(props: {
   const toggleCommand = () => {
     if (client?.connected) {
       if (status === EnumStatus.LOW) {
-        client.publish(topicControl, EnumStatus.HIGH);
+        client.publish(topicControl, EnumStatus.HIGH, { retain: true });
       } else if (status === EnumStatus.HIGH) {
-        client.publish(topicControl, EnumStatus.LOW);
+        client.publish(topicControl, EnumStatus.LOW, { retain: true });
       }
       setStatus(EnumStatus.SENDING);
     }
@@ -53,7 +53,7 @@ export default function ControlItem(props: {
           ? "Currently Off"
           : status === EnumStatus.HIGH
           ? "Currently On"
-          : "⏳ Sending command..."}
+          : "⏳ Loading..."}
       </p>
     </div>
   );
