@@ -1,39 +1,45 @@
 import { useEffect, useState } from "react";
 import { MqttClient } from "mqtt";
 import { mqttTopicId } from "../types";
+import { enumClientStatus } from "../pages/Control";
 
-enum EnumStatus {
+enum EnumSwitchStatus {
   LOW = "Off",
   HIGH = "On",
-  SENDING = "",
+  UNKNOWN = "Unknown",
 }
 
 export default function ControlItem(props: {
   client: MqttClient | null;
+  clientStatus: enumClientStatus;
   topicControl: mqttTopicId;
   topicStatus: mqttTopicId;
 }) {
-  const { client, topicControl, topicStatus } = props;
-  const [status, setStatus] = useState<String>("");
+  const { client, clientStatus, topicControl, topicStatus } = props;
+  const [status, setStatus] = useState<EnumSwitchStatus>(
+    EnumSwitchStatus.UNKNOWN
+  );
 
   useEffect(() => {
     client?.on("message", (topic, msg) => {
       console.log(`Received message on topic ${topic}: ${msg}`);
       if (topic === topicStatus) {
         const result: String = msg.toString();
-        setStatus(EnumStatus[result as keyof typeof EnumStatus]);
+        setStatus(EnumSwitchStatus[result as keyof typeof EnumSwitchStatus]);
       }
     });
   }, []);
 
   const toggleCommand = () => {
-    if (client?.connected) {
-      if (status === EnumStatus.LOW) {
-        client.publish(topicControl, EnumStatus.HIGH, { retain: true });
-      } else if (status === EnumStatus.HIGH) {
-        client.publish(topicControl, EnumStatus.LOW, { retain: true });
+    if (clientStatus === enumClientStatus.CONNECTED) {
+      if (status === EnumSwitchStatus.LOW) {
+        client?.publish(topicControl, EnumSwitchStatus.HIGH, { retain: true });
+      } else if (status === EnumSwitchStatus.HIGH) {
+        client?.publish(topicControl, EnumSwitchStatus.LOW, { retain: true });
       }
-      setStatus(EnumStatus.SENDING);
+      setStatus(EnumSwitchStatus.UNKNOWN);
+    } else {
+      setStatus(EnumSwitchStatus.UNKNOWN);
     }
   };
 
@@ -43,19 +49,9 @@ export default function ControlItem(props: {
         className="bg-green-500 text-white px-6 py-2 rounded"
         onClick={() => toggleCommand()}
       >
-        {status === EnumStatus.LOW
-          ? "On"
-          : status === EnumStatus.HIGH
-          ? "Off"
-          : "loading"}
+        {status}
       </button>
-      <p className="mt-4 text-lg">
-        {status === EnumStatus.LOW
-          ? "Currently Off"
-          : status === EnumStatus.HIGH
-          ? "Currently On"
-          : "⏳ Loading..."}
-      </p>
+      <p className="mt-4 text-lg">Currently {status}</p>
     </div>
   );
 }
