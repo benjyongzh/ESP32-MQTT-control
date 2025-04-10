@@ -67,7 +67,8 @@ export default function Control() {
         ))}
       </div>
       <p className="mt-4 text-lg">
-        {clientStatus === enumClientStatus.CONNECTED
+        {clientStatus === enumClientStatus.CONNECTED ||
+        clientStatus === enumClientStatus.RECONNECTED
           ? "✅ Connected to MQTT broker"
           : "Connecting to MQTT..."}
       </p>
