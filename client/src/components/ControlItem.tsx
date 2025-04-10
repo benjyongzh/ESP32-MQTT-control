@@ -21,8 +21,18 @@ export default function ControlItem(props: {
   );
 
   useEffect(() => {
+    client?.on("connect", () => {
+      client.subscribe(topicStatus, { qos: 1 }, (err) => {
+        if (!err) {
+          console.log("subscribing to", topicStatus);
+        }
+      });
+    });
+
     client?.on("message", (topic, msg) => {
-      console.log(`Received message on topic ${topic}: ${msg}`);
+      console.log(
+        `Received message on topic ${topic}: ${msg}: ${msg.toString()}`
+      );
       if (topic === topicStatus) {
         const result: String = msg.toString();
         setStatus(EnumSwitchStatus[result as keyof typeof EnumSwitchStatus]);

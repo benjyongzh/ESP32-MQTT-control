@@ -29,14 +29,6 @@ export default function Control() {
 
     mqttClient.on("connect", () => {
       console.log("mqttClient Connected");
-      topicItems.forEach((topic) => {
-        const topicStatus: string = getMqttTopicId(
-          topic,
-          enumMqttTopicType.STATUS
-        );
-        console.log("subscribing to", topicStatus);
-        mqttClient.subscribe(topicStatus);
-      });
       setClientStatus(enumClientStatus.CONNECTED);
     });
 
