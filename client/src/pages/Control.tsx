@@ -14,6 +14,7 @@ export enum enumClientStatus {
 
 export default function Control() {
   const [client, setClient] = useState<MqttClient | null>(null);
+  // @ts-ignore
   const [clientStatus, setClientStatus] = useState<enumClientStatus>(
     enumClientStatus.ERROR
   );
