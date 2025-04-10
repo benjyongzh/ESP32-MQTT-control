@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { MqttClient } from "mqtt";
 import { mqttTopicId } from "../types";
 import { enumClientStatus } from "../pages/Control";
+import { getEnumKeyByEnumValue } from "../utils";
 
 enum enumSwitchStatus {
   LOW = "Off",
@@ -36,11 +37,19 @@ export default function ControlItem(props: {
         console.log(
           `Received message on topic ${topic}: ${msg}: ${msg.toString()}`
         );
-        if (topic === topicStatus) {
-          const result: String = msg.toString();
-          setStatus(enumSwitchStatus[result as keyof typeof enumSwitchStatus]);
+        if (
+          topic === topicStatus &&
+          Object.keys(enumSwitchStatus).includes(msg.toString())
+        ) {
+          const key: string | number = getEnumKeyByEnumValue(
+            enumSwitchStatus,
+            msg.toString()
+          );
+          setStatus(enumSwitchStatus[key as keyof typeof enumSwitchStatus]);
         }
       });
+    } else if (clientStatus === enumClientStatus.ERROR) {
+      setStatus(enumSwitchStatus.UNKNOWN);
     }
   }, [clientStatus]);
 

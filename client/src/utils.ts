@@ -15,3 +15,10 @@ export const getArrayOfTopicItems = (
   }
   return array;
 };
+
+export function getEnumKeyByEnumValue(
+  myEnum: { [key: string | number]: string | number },
+  enumValue: string | number
+): string | number {
+  return Object.keys(myEnum)[Object.values(myEnum).indexOf(enumValue)];
+}
