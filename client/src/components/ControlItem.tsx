@@ -18,6 +18,7 @@ export default function ControlItem(props: {
 
   useEffect(() => {
     client?.on("message", (topic, msg) => {
+      console.log(`Received message on topic ${topic}: ${msg}`);
       if (topic === topicStatus) {
         const result: String = msg.toString();
         setStatus(EnumStatus[result as keyof typeof EnumStatus]);

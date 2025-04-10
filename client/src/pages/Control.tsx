@@ -5,19 +5,8 @@ import { TOPIC_LIST } from "../constants";
 import { mqttTopicItem, getMqttTopicId, enumMqttTopicType } from "../types";
 import { getArrayOfTopicItems } from "../utils";
 
-export enum enumClientStatus {
-  CONNECTED = "Connected",
-  ERROR = "Error",
-  RECONNECTED = "Reconnected",
-  CLOSED = "Closed",
-}
-
 export default function Control() {
   const [client, setClient] = useState<MqttClient | null>(null);
-  // @ts-ignore
-  const [clientStatus, setClientStatus] = useState<enumClientStatus>(
-    enumClientStatus.ERROR
-  );
 
   useEffect(() => {
     const mqttClient = mqtt.connect(import.meta.env.VITE_MQTT_CLUSTER_URL, {
@@ -37,22 +26,18 @@ export default function Control() {
         console.log("subscribing to", topicStatus);
         mqttClient.subscribe(topicStatus);
       });
-      setClientStatus(enumClientStatus.CONNECTED);
     });
 
     mqttClient.on("error", () => {
       console.log("mqttClient connection error");
-      setClientStatus(enumClientStatus.ERROR);
     });
 
     mqttClient.on("reconnect", () => {
       console.log("mqttClient reconnected");
-      setClientStatus(enumClientStatus.RECONNECTED);
     });
 
     mqttClient.on("close", () => {
       console.log("mqttClient connection closed");
-      setClientStatus(enumClientStatus.CLOSED);
     });
   }, []);
 
