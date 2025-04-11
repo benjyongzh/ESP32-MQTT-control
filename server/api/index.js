@@ -9,15 +9,16 @@ const SESSION_TTL_MS = 1000 * 60 * 60 * 24; // 1 day
 
 app.use(express.json());
 app.use(cookieParser());
-app.use(cors({
-  origin: process.env.FRONTEND_URL, // Vite frontend
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL, // Vite frontend
+    credentials: true,
+  })
+);
 
 // Token verification middleware
 function authMiddleware(req, res, next) {
   const token = req.cookies[process.env.COOKIE_NAME];
-  console.log("token:", token);
   if (token === process.env.SHARED_TOKEN) {
     return next();
   } else {
@@ -33,11 +34,11 @@ app.post("/auth/login", (req, res) => {
       httpOnly: true,
       secure: true,
       sameSite: "none",
-      maxAge: SESSION_TTL_MS
+      maxAge: SESSION_TTL_MS,
     });
     return res.json({ message: "Login successful" });
   } else {
-    return res.status(401).json({ message: "Invalid token" });
+    return res.status(401).json({ message: "Invalid Token" });
   }
 });
 
@@ -53,9 +54,9 @@ app.post("/auth/logout", (req, res) => {
 });
 
 // Fallback route
-app.get('/', (req, res) => {
-    res.send('ESP32 backend auth server reached');
-  });
+app.get("/", (req, res) => {
+  res.send("ESP32 backend auth server reached");
+});
 
 // app.listen(PORT, () => {
 //   console.log(`✅ Auth server running at ${PORT}`);
