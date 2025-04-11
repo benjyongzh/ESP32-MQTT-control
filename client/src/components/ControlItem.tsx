@@ -95,8 +95,8 @@ export default function ControlItem(props: {
 
   return (
     <TableRow key={topicItem}>
-      <TableCell className="font-medium">{topicItem}</TableCell>
-      <TableCell>{status}</TableCell>
+      <TableCell>{topicItem}</TableCell>
+      <TableCell className="text-center">{status}</TableCell>
       <TableCell className="text-right">
         <Switch
           id={topicItem}

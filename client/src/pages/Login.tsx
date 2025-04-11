@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ChevronRight, Ban } from "lucide-react";
+import Logo from "@/components/Logo";
 
 export default function Login() {
   const [token, setToken] = useState("");
@@ -29,9 +30,10 @@ export default function Login() {
   };
 
   return (
-    <div className="base">
-      <h1 className="text-2xl mb-4">Enter Shared Token</h1>
-      <div className="flex items-center justify-center gap-4">
+    <div className="base justify-center">
+      <Logo />
+      <h1 className="text-2xl mb-6">Enter Token</h1>
+      <div className="flex items-center justify-center gap-3">
         <Input
           type="password"
           placeholder="password"
