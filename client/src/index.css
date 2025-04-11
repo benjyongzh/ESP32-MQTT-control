@@ -1,11 +1,7 @@
 @import "tw-animate-css";
-@import "tailwindcss/preflight";
-@reference "tailwindcss";
+@import "tailwindcss";
 
-@custom-variant dark (&:is(.dark *));
-
-/* @tailwind base; */
-@tailwind utilities;
+/* @custom-variant dark (&:is(.dark *)); */
 
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
@@ -130,11 +126,14 @@
   * {
     @apply border-border outline-ring/50;
   }
+  root {
+    @apply h-screen w-screen;
+  }
   body {
-    @apply bg-background text-foreground min-h-screen min-w-full flex flex-col justify-start items-center m-0;
+    @apply bg-background text-foreground min-w-full flex flex-col justify-start items-center m-0 overflow-hidden;
   }
 
   .base {
-    @apply flex flex-col items-center justify-center h-screen w-full max-w-xl;
+    @apply flex flex-col items-center justify-start h-screen w-full max-w-xl mt-5 mb-5;
   }
 }
