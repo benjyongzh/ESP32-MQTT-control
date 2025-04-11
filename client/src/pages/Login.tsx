@@ -30,9 +30,9 @@ export default function Login() {
   };
 
   return (
-    <div className="base justify-center">
+    <div className="base justify-center -mt-5">
       <Logo />
-      <h1 className="text-2xl mb-6">Enter Token</h1>
+      <h1 className="mb-3">Enter Token</h1>
       <div className="flex items-center justify-center gap-3">
         <Input
           type="password"
