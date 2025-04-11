@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ChevronRight, Ban } from "lucide-react";
+import { ChevronRight, Ban, LoaderCircle } from "lucide-react";
 import Logo from "@/components/Logo";
 
 export default function Login() {
@@ -14,6 +14,7 @@ export default function Login() {
   const navigate = useNavigate();
 
   const handleLogin = async () => {
+    setError("");
     setIsLoading(true);
     try {
       await axios.post(
@@ -23,8 +24,14 @@ export default function Login() {
       );
       navigate("/control");
       setIsLoading(false);
-    } catch (err) {
-      setError("Invalid Token");
+    } catch (err: any) {
+      console.log(err);
+      if (err.response) {
+        setError(err.response.statusText);
+      } else {
+        setError(err.message);
+      }
+
       setIsLoading(false);
     }
   };
@@ -48,19 +55,23 @@ export default function Login() {
             className={isLoading ? "btn-disabled" : ""}
           >
             {isLoading ? (
-              <span className="loading loading-dots loading-md"></span>
+              <LoaderCircle className="animate-spin text-background" />
             ) : (
-              <ChevronRight />
+              <ChevronRight className="text-background" />
             )}
           </Button>
         </div>
-
-        {error && (
-          <Alert className="w-full" variant="destructive">
+        <div className="h-8 w-full">
+          <Alert
+            className={`w-full border-0 transition-opacity ease-in-out duration-200 ${
+              error ? "opacity-100" : "opacity-0"
+            }`}
+            variant="destructive"
+          >
             <Ban className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription>{error || ""}</AlertDescription>
           </Alert>
-        )}
+        </div>
       </div>
     </div>
   );

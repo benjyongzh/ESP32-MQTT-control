@@ -12,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { LoaderCircle } from "lucide-react";
 
 export enum enumClientStatus {
   CONNECTED = "Connected",
@@ -67,12 +68,20 @@ export default function Control() {
         <Logo />
       </div>
 
-      <p className="mb-4 sm:text-lg">
+      <div className="mb-4 flex justify-center items-center gap-2">
         {clientStatus === enumClientStatus.CONNECTED ||
-        clientStatus === enumClientStatus.RECONNECTED
-          ? "✅ Connected to MQTT broker"
-          : "Connecting to MQTT..."}
-      </p>
+        clientStatus === enumClientStatus.RECONNECTED ? (
+          "✅"
+        ) : (
+          <LoaderCircle className="animate-spin text-foreground" />
+        )}
+        <p className="sm:text-lg">
+          {clientStatus === enumClientStatus.CONNECTED ||
+          clientStatus === enumClientStatus.RECONNECTED
+            ? "Connected to MQTT broker"
+            : "Connecting to MQTT..."}
+        </p>
+      </div>
       <Table>
         <TableHeader>
           <TableRow>
