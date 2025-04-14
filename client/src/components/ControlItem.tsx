@@ -66,6 +66,11 @@ export default function ControlItem(props: {
         enumSwitchStatus,
         msg.toString()
       );
+      console.log("key", key);
+      console.log(
+        "enum:",
+        enumSwitchStatus[key as keyof typeof enumSwitchStatus]
+      );
       setStatus(enumSwitchStatus[key as keyof typeof enumSwitchStatus]);
     }
   };
