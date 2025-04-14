@@ -41,9 +41,9 @@ export default function ControlItem(props: {
       enumClientStatus.RECONNECTED
     ) {
       client?.subscribe(topicStatus, { qos: 1 }, (err) => {
-        if (!err) {
-          console.log("subscribing to", topicStatus);
-        } else console.log(`subcription error for ${topicStatus}`, err);
+        // if (!err) {
+        //   console.log("subscribing to", topicStatus);
+        // } else console.log(`subcription error for ${topicStatus}`, err);
       });
 
       client?.on("message", (topic, msg) => {
@@ -55,9 +55,9 @@ export default function ControlItem(props: {
   };
 
   const onMessageReceived = (topic: string, msg: Buffer<ArrayBufferLike>) => {
-    console.log(
-      `Received message on topic ${topic}: ${msg}: ${msg.toString()}`
-    );
+    // console.log(
+    //   `Received message on topic ${topic}: ${msg}: ${msg.toString()}`
+    // );
     if (
       topic === topicStatus &&
       Object.keys(enumSwitchStatus).includes(msg.toString())
@@ -65,11 +65,6 @@ export default function ControlItem(props: {
       const key: string | number = getEnumKeyByEnumValue(
         enumSwitchStatus,
         msg.toString()
-      );
-      console.log("key", key);
-      console.log(
-        "enum:",
-        enumSwitchStatus[key as keyof typeof enumSwitchStatus]
       );
       setStatus(enumSwitchStatus[key as keyof typeof enumSwitchStatus]);
     }
@@ -83,10 +78,10 @@ export default function ControlItem(props: {
     (checked: boolean) => {
       if (checked) {
         client?.publish(topicControl, enumSwitchStatus.HIGH, { retain: true });
-        console.log("published:", enumSwitchStatus.HIGH);
+        // console.log("published:", enumSwitchStatus.HIGH);
       } else {
         client?.publish(topicControl, enumSwitchStatus.LOW, { retain: true });
-        console.log("published:", enumSwitchStatus.LOW);
+        // console.log("published:", enumSwitchStatus.LOW);
       }
     },
     [client, topicControl]
@@ -100,7 +95,7 @@ export default function ControlItem(props: {
       ) {
         sendCommand(checked);
         // setStatus(checked ? enumSwitchStatus.HIGH : enumSwitchStatus.LOW);
-        console.log("switch is now", checked);
+        // console.log("switch is now", checked);
       }
       setStatus(enumSwitchStatus.UNKNOWN);
     },
