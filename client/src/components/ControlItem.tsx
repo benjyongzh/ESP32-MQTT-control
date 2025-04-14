@@ -13,9 +13,9 @@ import { Switch } from "./ui/switch";
 import SwitchStatusText from "./SwitchStatusText";
 
 export enum enumSwitchStatus {
-  LOW = "Off",
-  HIGH = "On",
-  UNKNOWN = "Unknown",
+  LOW = "LOW",
+  HIGH = "HIGH",
+  UNKNOWN = "UNKNOWN",
 }
 
 export default function ControlItem(props: {
