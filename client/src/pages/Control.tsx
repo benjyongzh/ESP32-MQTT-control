@@ -86,7 +86,7 @@ export default function Control() {
         <TableHeader>
           <TableRow>
             <TableHead className="w-40 sm:w-48">Valve</TableHead>
-            <TableHead className="w-30 sm:w-32 text-center">Status</TableHead>
+            <TableHead className="w-30 sm:w-32 text-center">State</TableHead>
             <TableHead className="w-16 text-right">Control</TableHead>
           </TableRow>
         </TableHeader>
