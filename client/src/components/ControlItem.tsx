@@ -5,6 +5,7 @@ import {
   mqttTopicItem,
   getMqttTopicId,
   enumMqttTopicType,
+  mqttMessage,
 } from "../types";
 import { enumClientStatus } from "../pages/Control";
 import { getEnumKeyByEnumValue } from "../utils";
@@ -25,6 +26,7 @@ export default function ControlItem(props: {
 }) {
   const { client, clientStatus, topicItem } = props;
   const [status, setStatus] = useState<enumSwitchStatus>(enumSwitchStatus.LOW);
+  const [lastUpdated, setLastUpdated] = useState<string>("");
 
   const topicControl: mqttTopicId = useMemo(
     () => getMqttTopicId(topicItem, enumMqttTopicType.CONTROL),
@@ -58,15 +60,16 @@ export default function ControlItem(props: {
     // console.log(
     //   `Received message on topic ${topic}: ${msg}: ${msg.toString()}`
     // );
-    if (
-      topic === topicStatus &&
-      Object.keys(enumSwitchStatus).includes(msg.toString())
-    ) {
-      const key: string | number = getEnumKeyByEnumValue(
-        enumSwitchStatus,
-        msg.toString()
-      );
-      setStatus(enumSwitchStatus[key as keyof typeof enumSwitchStatus]);
+    if (topic === topicStatus) {
+      const payload: mqttMessage = JSON.parse(msg.toString());
+      if (Object.keys(enumSwitchStatus).includes(payload.message)) {
+        const key: string | number = getEnumKeyByEnumValue(
+          enumSwitchStatus,
+          payload.message
+        );
+        setStatus(enumSwitchStatus[key as keyof typeof enumSwitchStatus]);
+        setLastUpdated(payload.timestamp);
+      }
     }
   };
 
@@ -76,13 +79,14 @@ export default function ControlItem(props: {
 
   const sendCommand = useCallback(
     (checked: boolean) => {
-      if (checked) {
-        client?.publish(topicControl, enumSwitchStatus.HIGH, { retain: true });
-        // console.log("published:", enumSwitchStatus.HIGH);
-      } else {
-        client?.publish(topicControl, enumSwitchStatus.LOW, { retain: true });
-        // console.log("published:", enumSwitchStatus.LOW);
-      }
+      const message: mqttMessage = {
+        message: checked ? enumSwitchStatus.HIGH : enumSwitchStatus.LOW,
+        timestamp: new Date().toISOString(),
+      };
+      client?.publish(topicControl, JSON.stringify(message), {
+        retain: true,
+      });
+      // console.log("published:", enumSwitchStatus.LOW);
     },
     [client, topicControl]
   );
@@ -108,6 +112,7 @@ export default function ControlItem(props: {
       <TableCell className="text-center">
         <SwitchStatusText status={status} />
       </TableCell>
+      <TableCell className="text-center">{lastUpdated}</TableCell>
       <TableCell className="text-center">
         <Switch
           id={topicItem}

@@ -21,3 +21,8 @@ export const getMqttTopicId = (
 
 export type mqttTopicId = `${mqttTopicItem}/${enumMqttTopicType}`;
 // const id: mqttTopicId = 'irrigation/1/control';
+
+export type mqttMessage = {
+  message: string;
+  timestamp: string;
+};
