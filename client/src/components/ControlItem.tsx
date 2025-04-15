@@ -9,10 +9,8 @@ import {
 } from "../types";
 import { enumClientStatus } from "../pages/Control";
 import { getEnumKeyByEnumValue } from "../utils";
-import { TableCell, TableRow } from "@/components/ui/table";
 import { Switch } from "./ui/switch";
 import SwitchStatusText from "./SwitchStatusText";
-import { Button } from "./ui/button";
 import {
   AccordionContent,
   AccordionItem,

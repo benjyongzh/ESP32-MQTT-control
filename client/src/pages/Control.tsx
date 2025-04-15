@@ -5,13 +5,6 @@ import Logo from "@/components/Logo";
 import { TOPIC_LIST } from "../constants";
 import { mqttTopicItem } from "../types";
 import { getArrayOfTopicItems } from "../utils";
-import {
-  Table,
-  TableBody,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { LoaderCircle } from "lucide-react";
 import { Accordion } from "@/components/ui/accordion";
 
