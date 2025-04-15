@@ -30,7 +30,7 @@ export default function ControlItem(props: {
 }) {
   const { client, clientStatus, topicItem } = props;
   const [status, setStatus] = useState<enumSwitchStatus>(enumSwitchStatus.LOW);
-  const [lastUpdated, setLastUpdated] = useState<string>("");
+  const [lastUpdated, setLastUpdated] = useState<string>("unregistered");
 
   const topicControl: mqttTopicId = useMemo(
     () => getMqttTopicId(topicItem, enumMqttTopicType.CONTROL),
@@ -131,7 +131,7 @@ export default function ControlItem(props: {
       </div>
 
       <AccordionContent className="text-xs pl-16 text-muted-foreground pb-3">
-        Last updated: {/* {lastUpdated} */}test
+        Last updated: {lastUpdated}
       </AccordionContent>
     </AccordionItem>
   );
