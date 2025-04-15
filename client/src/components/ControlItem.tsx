@@ -12,6 +12,12 @@ import { getEnumKeyByEnumValue } from "../utils";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Switch } from "./ui/switch";
 import SwitchStatusText from "./SwitchStatusText";
+import { Button } from "./ui/button";
+import {
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 export enum enumSwitchStatus {
   LOW = "LOW",
@@ -107,18 +113,28 @@ export default function ControlItem(props: {
   );
 
   return (
-    <TableRow key={topicItem}>
-      <TableCell>{topicItem}</TableCell>
-      <TableCell className="text-center">
-        <SwitchStatusText status={status} />
-      </TableCell>
-      <TableCell className="text-center">{lastUpdated}</TableCell>
-      <TableCell className="text-center">
-        <Switch
-          id={topicItem}
-          onCheckedChange={(checked: boolean) => onSwitchChange(checked)}
-        />
-      </TableCell>
-    </TableRow>
+    <AccordionItem value={topicItem}>
+      <div className="flex items-center">
+        <div className="w-16 text-center">
+          <SwitchStatusText status={status} />
+        </div>
+        <div className="w-48">
+          <AccordionTrigger>
+            <p className="text-left">{topicItem}</p>
+          </AccordionTrigger>
+        </div>
+
+        <div className="w-16 text-center">
+          <Switch
+            id={topicItem}
+            onCheckedChange={(checked: boolean) => onSwitchChange(checked)}
+          />
+        </div>
+      </div>
+
+      <AccordionContent className="text-xs pl-16 text-muted-foreground pb-3">
+        Last updated: {/* {lastUpdated} */}test
+      </AccordionContent>
+    </AccordionItem>
   );
 }

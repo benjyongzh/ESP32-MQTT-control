@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { LoaderCircle } from "lucide-react";
+import { Accordion } from "@/components/ui/accordion";
 
 export enum enumClientStatus {
   CONNECTED = "Connected",
@@ -82,27 +83,23 @@ export default function Control() {
             : "Connecting to MQTT..."}
         </p>
       </div>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-40 sm:w-48">Valve</TableHead>
-            <TableHead className="w-20 sm:w-32 text-center">State</TableHead>
-            <TableHead className="w-30 sm:w-32 text-center">
-              Last Updated
-            </TableHead>
-            <TableHead className="w-16 text-right">Control</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
+      <div className="flex flex-col">
+        <div className="flex items-center">
+          <div className="w-16 text-center">State</div>
+          <div className="w-48 text-left">Topic</div>
+          <div className="w-16 text-center">Control</div>
+        </div>
+        <Accordion type="single" collapsible>
           {topicItems.map((topic: mqttTopicItem) => (
             <ControlItem
               client={client}
               clientStatus={clientStatus}
               topicItem={topic}
+              key={topic}
             />
           ))}
-        </TableBody>
-      </Table>
+        </Accordion>
+      </div>
     </div>
   );
 }
