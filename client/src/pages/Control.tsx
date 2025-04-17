@@ -13,7 +13,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import ConfigItem from "@/components/ConfigItem";
@@ -44,8 +43,6 @@ export default function Control() {
     [TOPIC_LIST]
   );
 
-  // const onSaveConfig = () => {};
-
   return (
     <div className="base relative">
       <Dialog>
@@ -56,27 +53,23 @@ export default function Control() {
         </DialogTrigger>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Configuration</DialogTitle>
-            <DialogDescription>
-              Make changes to your configuration here. Click save when you're
-              done.
+            <DialogTitle className="text-left">Configuration</DialogTitle>
+            <DialogDescription className="text-left">
+              Make changes to HIGH duration settings for each valve here
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
+          <div className="flex flex-col items-stretch justify-between gap-4 mt-4">
             {topicItems.map((topic) => (
               <ConfigItem key={topic} client={client} topicItem={topic} />
             ))}
           </div>
-          <DialogFooter>
-            {/* <Button onClick={() => onSaveConfig()}>Save</Button> */}
-          </DialogFooter>
         </DialogContent>
       </Dialog>
       <div className="mt-42">
         <Logo />
       </div>
 
-      <div className="mb-4 w-full flex justify-center items-center gap-2">
+      <div className="mb-4 w-full max-w-xl flex justify-center items-center gap-2">
         {clientStatus === enumClientStatus.CONNECTED ||
         clientStatus === enumClientStatus.RECONNECTED ? (
           "✅"

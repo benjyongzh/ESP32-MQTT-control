@@ -22,3 +22,16 @@ export function getEnumKeyByEnumValue(
 ): string | number {
   return Object.keys(myEnum)[Object.values(myEnum).indexOf(enumValue)];
 }
+
+export const dateFormatter = new Intl.DateTimeFormat("en-SG", {
+  timeZone: "Asia/Singapore",
+  year: "numeric",
+  month: "short",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
+});
+// console.log(dateFormatter.format(date));
+// Example: "15 Apr 2025, 22:47:18"

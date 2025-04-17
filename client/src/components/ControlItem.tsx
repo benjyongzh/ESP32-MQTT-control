@@ -8,7 +8,7 @@ import {
   mqttMessage,
 } from "../types";
 import { enumClientStatus } from "../pages/Control";
-import { getEnumKeyByEnumValue } from "../utils";
+import { getEnumKeyByEnumValue, dateFormatter } from "../utils";
 import { Switch } from "./ui/switch";
 import SwitchStatusText from "./SwitchStatusText";
 import { useMqttClient } from "./hooks/useMqttClient";
@@ -46,14 +46,10 @@ export default function ControlItem(props: {
     () => getMqttTopicId(topicItem, enumMqttTopicType.STATUS),
     [topicItem]
   );
-  const topicConfig: mqttTopicId = useMemo(
-    () => getMqttTopicId(topicItem, enumMqttTopicType.CONFIG),
-    [topicItem]
-  );
 
   const { clientStatus } = useMqttClient({
     mqttClient: client,
-    topics: [topicControl, topicStatus, topicConfig],
+    topics: [topicControl, topicStatus],
     onMessage: onMessageReceived,
   });
   const [status, setStatus] = useState<enumSwitchStatus>(enumSwitchStatus.LOW);
@@ -105,6 +101,14 @@ export default function ControlItem(props: {
     [clientStatus, sendCommand]
   );
 
+  const formattedDate: string = useMemo(
+    () =>
+      lastUpdated === "unregistered"
+        ? lastUpdated
+        : dateFormatter.format(new Date(lastUpdated)),
+    [lastUpdated]
+  );
+
   return (
     <div className="flex items-center w-full border-b-1 border-primary-foreground py-2">
       <div className="w-16 text-center">
@@ -113,7 +117,7 @@ export default function ControlItem(props: {
       <div className="w-60 flex flex-col gap-1">
         <p className="text-left">{topicItem}</p>
         <p className="text-left text-xs text-muted-foreground">
-          Updated: {lastUpdated}
+          Updated: {formattedDate}
         </p>
       </div>
 
