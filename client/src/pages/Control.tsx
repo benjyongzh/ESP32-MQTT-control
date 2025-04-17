@@ -5,8 +5,19 @@ import Logo from "@/components/Logo";
 import { TOPIC_LIST } from "../constants";
 import { mqttTopicItem } from "../types";
 import { getArrayOfTopicItems } from "../utils";
-import { LoaderCircle } from "lucide-react";
-import { Accordion } from "@/components/ui/accordion";
+import { LoaderCircle, Bolt } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import ConfigItem from "@/components/ConfigItem";
+import { useMqttClient } from "@/components/hooks/useMqttClient";
 
 export enum enumClientStatus {
   CONNECTED = "Connected",
@@ -17,10 +28,7 @@ export enum enumClientStatus {
 
 export default function Control() {
   const [client, setClient] = useState<MqttClient | null>(null);
-  // @ts-ignore
-  const [clientStatus, setClientStatus] = useState<enumClientStatus>(
-    enumClientStatus.ERROR
-  );
+  const { clientStatus } = useMqttClient({ mqttClient: client });
 
   useEffect(() => {
     const mqttClient = mqtt.connect(import.meta.env.VITE_MQTT_CLUSTER_URL, {
@@ -29,26 +37,6 @@ export default function Control() {
     });
 
     setClient(mqttClient);
-
-    mqttClient.on("connect", () => {
-      console.log("mqttClient Connected");
-      setClientStatus(enumClientStatus.CONNECTED);
-    });
-
-    mqttClient.on("error", () => {
-      console.log("mqttClient connection error");
-      setClientStatus(enumClientStatus.ERROR);
-    });
-
-    mqttClient.on("reconnect", () => {
-      console.log("mqttClient reconnected");
-      setClientStatus(enumClientStatus.RECONNECTED);
-    });
-
-    mqttClient.on("close", () => {
-      console.log("mqttClient connection closed");
-      setClientStatus(enumClientStatus.CLOSED);
-    });
   }, []);
 
   const topicItems: mqttTopicItem[] = useMemo(
@@ -56,13 +44,39 @@ export default function Control() {
     [TOPIC_LIST]
   );
 
+  // const onSaveConfig = () => {};
+
   return (
-    <div className="base">
+    <div className="base relative">
+      <Dialog>
+        <DialogTrigger asChild>
+          <Button variant={"ghost"} className="absolute right-3">
+            <Bolt />
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Configuration</DialogTitle>
+            <DialogDescription>
+              Make changes to your configuration here. Click save when you're
+              done.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            {topicItems.map((topic) => (
+              <ConfigItem key={topic} client={client} topicItem={topic} />
+            ))}
+          </div>
+          <DialogFooter>
+            {/* <Button onClick={() => onSaveConfig()}>Save</Button> */}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <div className="mt-42">
         <Logo />
       </div>
 
-      <div className="mb-4 flex justify-center items-center gap-2">
+      <div className="mb-4 w-full flex justify-center items-center gap-2">
         {clientStatus === enumClientStatus.CONNECTED ||
         clientStatus === enumClientStatus.RECONNECTED ? (
           "✅"
@@ -77,21 +91,16 @@ export default function Control() {
         </p>
       </div>
       <div className="flex flex-col">
-        <div className="flex items-center">
+        <div className="flex items-center border-b-1 border-primary-foreground pb-2">
           <div className="w-16 text-center">State</div>
-          <div className="w-48 text-left">Topic</div>
+          <div className="w-60 text-left">Topic</div>
           <div className="w-16 text-center">Control</div>
         </div>
-        <Accordion type="single" collapsible>
+        <div className="flex flex-col w-full justify-start items-stretch">
           {topicItems.map((topic: mqttTopicItem) => (
-            <ControlItem
-              client={client}
-              clientStatus={clientStatus}
-              topicItem={topic}
-              key={topic}
-            />
+            <ControlItem client={client} topicItem={topic} key={topic} />
           ))}
-        </Accordion>
+        </div>
       </div>
     </div>
   );

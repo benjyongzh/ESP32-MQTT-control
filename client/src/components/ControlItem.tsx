@@ -11,11 +11,7 @@ import { enumClientStatus } from "../pages/Control";
 import { getEnumKeyByEnumValue } from "../utils";
 import { Switch } from "./ui/switch";
 import SwitchStatusText from "./SwitchStatusText";
-import {
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+import { useMqttClient } from "./hooks/useMqttClient";
 
 export enum enumSwitchStatus {
   LOW = "LOW",
@@ -25,47 +21,12 @@ export enum enumSwitchStatus {
 
 export default function ControlItem(props: {
   client: MqttClient | null;
-  clientStatus: enumClientStatus;
   topicItem: mqttTopicItem;
 }) {
-  const { client, clientStatus, topicItem } = props;
-  const [status, setStatus] = useState<enumSwitchStatus>(enumSwitchStatus.LOW);
-  const [lastUpdated, setLastUpdated] = useState<string>("unregistered");
+  const { client, topicItem } = props;
 
-  const topicControl: mqttTopicId = useMemo(
-    () => getMqttTopicId(topicItem, enumMqttTopicType.CONTROL),
-    [topicItem]
-  );
-  const topicStatus: mqttTopicId = useMemo(
-    () => getMqttTopicId(topicItem, enumMqttTopicType.STATUS),
-    [topicItem]
-  );
-
-  const onClientConnect = () => {
-    if (
-      clientStatus === enumClientStatus.CONNECTED ||
-      enumClientStatus.RECONNECTED
-    ) {
-      client?.subscribe(topicStatus, { qos: 1 }, (err) => {
-        // if (!err) {
-        //   console.log("subscribing to", topicStatus);
-        // } else console.log(`subcription error for ${topicStatus}`, err);
-      });
-
-      client?.on("message", (topic, msg) => {
-        onMessageReceived(topic, msg);
-      });
-    } else if (clientStatus === enumClientStatus.ERROR) {
-      setStatus(enumSwitchStatus.UNKNOWN);
-    }
-  };
-
-  const onMessageReceived = (topic: string, msg: Buffer<ArrayBufferLike>) => {
-    // console.log(
-    //   `Received message on topic ${topic}: ${msg}: ${msg.toString()}`
-    // );
+  const onMessageReceived = (topic: string, payload: mqttMessage) => {
     if (topic === topicStatus) {
-      const payload: mqttMessage = JSON.parse(msg.toString());
       if (Object.keys(enumSwitchStatus).includes(payload.message)) {
         const key: string | number = getEnumKeyByEnumValue(
           enumSwitchStatus,
@@ -77,8 +38,32 @@ export default function ControlItem(props: {
     }
   };
 
+  const topicControl: mqttTopicId = useMemo(
+    () => getMqttTopicId(topicItem, enumMqttTopicType.CONTROL),
+    [topicItem]
+  );
+  const topicStatus: mqttTopicId = useMemo(
+    () => getMqttTopicId(topicItem, enumMqttTopicType.STATUS),
+    [topicItem]
+  );
+  const topicConfig: mqttTopicId = useMemo(
+    () => getMqttTopicId(topicItem, enumMqttTopicType.CONFIG),
+    [topicItem]
+  );
+
+  const { clientStatus } = useMqttClient({
+    mqttClient: client,
+    topics: [topicControl, topicStatus, topicConfig],
+    onMessage: onMessageReceived,
+  });
+  const [status, setStatus] = useState<enumSwitchStatus>(enumSwitchStatus.LOW);
+  const [lastUpdated, setLastUpdated] = useState<string>("unregistered");
+  // const [configDuration, setConfigDuration] = useState<number>(3000);
+
   useEffect(() => {
-    onClientConnect();
+    if (clientStatus === enumClientStatus.ERROR) {
+      setStatus(enumSwitchStatus.UNKNOWN);
+    }
   }, [clientStatus]);
 
   const sendCommand = useCallback(
@@ -94,6 +79,16 @@ export default function ControlItem(props: {
     },
     [client, topicControl]
   );
+
+  // const sendConfig = useCallback(() => {
+  //   const message: mqttMessage = {
+  //     message: configDuration.toString(),
+  //     timestamp: new Date().toISOString(),
+  //   };
+  //   client?.publish(topicConfig, JSON.stringify(message), {
+  //     retain: true,
+  //   });
+  // }, [client, topicConfig]);
 
   const onSwitchChange = useCallback(
     (checked: boolean) => {
@@ -111,28 +106,23 @@ export default function ControlItem(props: {
   );
 
   return (
-    <AccordionItem value={topicItem}>
-      <div className="flex items-center">
-        <div className="w-16 text-center">
-          <SwitchStatusText status={status} />
-        </div>
-        <div className="w-48">
-          <AccordionTrigger>
-            <p className="text-left">{topicItem}</p>
-          </AccordionTrigger>
-        </div>
-
-        <div className="w-16 text-center">
-          <Switch
-            id={topicItem}
-            onCheckedChange={(checked: boolean) => onSwitchChange(checked)}
-          />
-        </div>
+    <div className="flex items-center w-full border-b-1 border-primary-foreground py-2">
+      <div className="w-16 text-center">
+        <SwitchStatusText status={status} />
+      </div>
+      <div className="w-60 flex flex-col gap-1">
+        <p className="text-left">{topicItem}</p>
+        <p className="text-left text-xs text-muted-foreground">
+          Updated: {lastUpdated}
+        </p>
       </div>
 
-      <AccordionContent className="text-xs pl-16 text-muted-foreground pb-3">
-        Last updated: {lastUpdated}
-      </AccordionContent>
-    </AccordionItem>
+      <div className="w-16 text-center">
+        <Switch
+          id={topicItem}
+          onCheckedChange={(checked: boolean) => onSwitchChange(checked)}
+        />
+      </div>
+    </div>
   );
 }

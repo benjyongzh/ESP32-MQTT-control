@@ -10,6 +10,7 @@ export const makeMqttTopicItem = (
 export enum enumMqttTopicType {
   CONTROL = "control",
   STATUS = "status",
+  CONFIG = "config",
 }
 
 export const getMqttTopicId = (
