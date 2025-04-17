@@ -3,9 +3,9 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ChevronRight, Ban, LoaderCircle } from "lucide-react";
+import { ChevronRight, LoaderCircle } from "lucide-react";
 import Logo from "@/components/Logo";
+import { toast } from "sonner";
 
 export default function Login() {
   const [token, setToken] = useState("");
@@ -31,13 +31,14 @@ export default function Login() {
       } else {
         setError(err.message);
       }
+      toast.error(error);
 
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="base justify-center -mt-5">
+    <div className="base justify-center max-w-xl -mt-5">
       <Logo />
       <h1 className="mb-3">Enter Token</h1>
       <div className="w-full flex flex-col justify-center items-center gap-6">
@@ -60,17 +61,6 @@ export default function Login() {
               <ChevronRight className="text-background" />
             )}
           </Button>
-        </div>
-        <div className="h-8 w-full">
-          <Alert
-            className={`w-full border-0 transition-opacity ease-in-out duration-200 ${
-              error ? "opacity-100" : "opacity-0"
-            }`}
-            variant="destructive"
-          >
-            <Ban className="h-4 w-4" />
-            <AlertDescription>{error || ""}</AlertDescription>
-          </Alert>
         </div>
       </div>
     </div>
