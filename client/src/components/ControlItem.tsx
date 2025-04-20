@@ -27,10 +27,10 @@ export default function ControlItem(props: {
 
   const onMessageReceived = (topic: string, payload: mqttMessage) => {
     if (topic === topicStatus) {
-      if (Object.keys(enumSwitchStatus).includes(payload.message)) {
+      if (Object.keys(enumSwitchStatus).includes(payload.message as string)) {
         const key: string | number = getEnumKeyByEnumValue(
           enumSwitchStatus,
-          payload.message
+          payload.message as string
         );
         setStatus(enumSwitchStatus[key as keyof typeof enumSwitchStatus]);
         setLastUpdated(payload.timestamp);

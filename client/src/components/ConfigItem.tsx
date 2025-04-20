@@ -6,6 +6,7 @@ import {
   getMqttTopicId,
   enumMqttTopicType,
   mqttMessage,
+  mqttConfigMessage,
 } from "../types";
 import { Label } from "./ui/label";
 import { Slider } from "./ui/slider";
@@ -24,7 +25,10 @@ export default function ConfigItem(props: {
   );
 
   const onMessageReceived = (topic: string, payload: mqttMessage) => {
-    if (topic === topicConfig) setConfigDuration(parseInt(payload.message));
+    if (topic === topicConfig) {
+      const message: mqttConfigMessage = payload.message as mqttConfigMessage;
+      if (message.duration) setConfigDuration(parseInt(message.duration!));
+    }
   };
 
   const { clientStatus } = useMqttClient({
@@ -37,7 +41,7 @@ export default function ConfigItem(props: {
 
   const onValueCommit = useCallback(() => {
     const message: mqttMessage = {
-      message: configDuration.toString(),
+      message: { duration: configDuration.toString() },
       timestamp: new Date().toISOString(),
     };
     console.log("message to publish: ", topicConfig, message);
