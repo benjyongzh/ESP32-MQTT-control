@@ -51,7 +51,7 @@ export default function Control() {
             <Bolt />
           </Button>
         </DialogTrigger>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-xs md:max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-left">Configuration</DialogTitle>
             <DialogDescription className="text-left">
