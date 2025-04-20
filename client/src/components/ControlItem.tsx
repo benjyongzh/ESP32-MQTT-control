@@ -97,7 +97,7 @@ export default function ControlItem(props: {
 
   return (
     <div className="table-grid-row w-full border-b-1 border-primary-foreground py-2">
-      <div className="flex items-center text-center">
+      <div className="flex items-center justify-center text-center">
         <SwitchStatusText status={status} />
       </div>
       <div className="flex flex-col justify-center gap-1">
@@ -107,7 +107,7 @@ export default function ControlItem(props: {
         </p>
       </div>
 
-      <div className="flex items-center text-center">
+      <div className="flex items-center justify-center text-center">
         <Switch
           id={topicItem}
           checked={status === enumSwitchStatus.HIGH}

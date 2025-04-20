@@ -68,10 +68,8 @@ export default function ConfigItem(props: {
   );
 
   return (
-    <div className="flex items-center justify-between gap-4">
-      <Label htmlFor={topicItem} className="w-48">
-        {topicItem} HIGH Duration
-      </Label>
+    <div className="grid grid-cols-[minmax(115px,_1fr)_minmax(0,_10fr)_minmax(64px,_1fr)] gap-2 items-center">
+      <Label htmlFor={topicItem}>{topicItem} HIGH Duration</Label>
       <Slider
         onValueChange={([value]) => setConfigDuration(value)}
         onValueCommit={() => onValueCommit()}
@@ -82,7 +80,7 @@ export default function ConfigItem(props: {
         step={100}
         name={topicItem}
       />
-      <p className="text-right w-16">{displayedDuration} s</p>
+      <p className="text-right">{displayedDuration} s</p>
     </div>
   );
 }
