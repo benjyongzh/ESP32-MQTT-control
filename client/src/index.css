@@ -136,4 +136,8 @@
   .base {
     @apply flex flex-col items-center justify-start h-screen w-screen mt-5 mb-5 px-8;
   }
+
+  .table-grid-row {
+    @apply grid grid-cols-[1fr_minmax(200px,_10fr)_1fr];
+  }
 }

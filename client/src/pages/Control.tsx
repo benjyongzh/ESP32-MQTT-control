@@ -83,17 +83,13 @@ export default function Control() {
             : "Connecting to MQTT..."}
         </p>
       </div>
-      <div className="grid grid-cols-[1fr_auto_1fr]">
-        <div className="text-center border-b-1 border-primary-foreground pb-2">
-          State
+      <div className="flex flex-col max-w-screen-lg">
+        <div className="table-grid-row border-b-1 border-primary-foreground pb-2">
+          <div className="text-center">State</div>
+          <div className="text-left">Topic</div>
+          <div className="text-center">Control</div>
         </div>
-        <div className="text-left border-b-1 border-primary-foreground pb-2">
-          Topic
-        </div>
-        <div className="text-center border-b-1 border-primary-foreground pb-2">
-          Control
-        </div>
-        <div className="col-span-full">
+        <div className="flex flex-col w-full justify-start items-stretch">
           {topicItems.map((topic: mqttTopicItem) => (
             <ControlItem client={client} topicItem={topic} key={topic} />
           ))}
