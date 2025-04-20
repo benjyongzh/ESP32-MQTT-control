@@ -69,7 +69,7 @@ export default function ConfigItem(props: {
 
   return (
     <div className="flex items-center justify-between gap-4">
-      <Label htmlFor={topicItem} className="w-20">
+      <Label htmlFor={topicItem} className="w-48">
         {topicItem} HIGH Duration
       </Label>
       <Slider
