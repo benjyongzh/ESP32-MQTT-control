@@ -18,6 +18,7 @@ export default function ConfigItem(props: {
   topicItem: mqttTopicItem;
 }) {
   const { client, topicItem } = props;
+  const [configDuration, setConfigDuration] = useState<number>(3000);
 
   const topicConfig: mqttTopicId = useMemo(
     () => getMqttTopicId(topicItem, enumMqttTopicType.CONFIG),
@@ -27,7 +28,7 @@ export default function ConfigItem(props: {
   const onMessageReceived = (topic: string, payload: mqttMessage) => {
     if (topic === topicConfig) {
       const message: mqttConfigMessage = payload.message as mqttConfigMessage;
-      if (message.duration) setConfigDuration(parseInt(message.duration!));
+      if (message.duration) setConfigDuration(parseInt(message.duration));
     }
   };
 
@@ -36,8 +37,6 @@ export default function ConfigItem(props: {
     topics: [topicConfig],
     onMessage: onMessageReceived,
   });
-
-  const [configDuration, setConfigDuration] = useState<number>(3000);
 
   const onValueCommit = useCallback(() => {
     const message: mqttMessage = {
