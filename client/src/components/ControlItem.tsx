@@ -124,6 +124,7 @@ export default function ControlItem(props: {
       <div className="w-16 text-center">
         <Switch
           id={topicItem}
+          checked={status === enumSwitchStatus.HIGH}
           onCheckedChange={(checked: boolean) => onSwitchChange(checked)}
         />
       </div>
