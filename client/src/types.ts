@@ -29,5 +29,7 @@ export type mqttMessage = {
 };
 
 export type mqttConfigMessage = {
-  duration?: string;
+  duration?: number;
+  // add other config properties here in the future
+  // e.g. pressure: number, enabled: boolean, etc.
 };

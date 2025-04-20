@@ -28,7 +28,7 @@ export default function ConfigItem(props: {
   const onMessageReceived = (topic: string, payload: mqttMessage) => {
     if (topic === topicConfig) {
       const message: mqttConfigMessage = payload.message as mqttConfigMessage;
-      if (message.duration) setConfigDuration(parseInt(message.duration));
+      if (message.duration) setConfigDuration(message.duration);
     }
   };
 
@@ -40,7 +40,7 @@ export default function ConfigItem(props: {
 
   const onValueCommit = useCallback(() => {
     const message: mqttMessage = {
-      message: { duration: configDuration.toString() },
+      message: { duration: configDuration },
       timestamp: new Date().toISOString(),
     };
     console.log("message to publish: ", topicConfig, message);
