@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { MqttClient } from "mqtt";
 import {
   mqttTopicId,
@@ -38,6 +38,15 @@ export default function ConfigItem(props: {
     topics: [topicConfig],
     onMessage: onMessageReceived,
   });
+
+  useEffect(() => {
+    client?.on("message", (topic: string, payload: Buffer<ArrayBufferLike>) => {
+      if (topic === topicConfig) {
+        const payloadObject: mqttMessage = JSON.parse(payload.toString());
+        onMessageReceived(topic, payloadObject);
+      }
+    });
+  }, [clientStatus]);
 
   const onValueCommit = useCallback(() => {
     const message: mqttMessage = {
