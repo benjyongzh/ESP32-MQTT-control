@@ -54,7 +54,6 @@ export default function ControlItem(props: {
   });
   const [status, setStatus] = useState<enumSwitchStatus>(enumSwitchStatus.LOW);
   const [lastUpdated, setLastUpdated] = useState<string>("unregistered");
-  // const [configDuration, setConfigDuration] = useState<number>(3000);
 
   useEffect(() => {
     if (clientStatus === enumClientStatus.ERROR) {
@@ -71,20 +70,9 @@ export default function ControlItem(props: {
       client?.publish(topicControl, JSON.stringify(message), {
         retain: true,
       });
-      // console.log("published:", enumSwitchStatus.LOW);
     },
     [client, topicControl]
   );
-
-  // const sendConfig = useCallback(() => {
-  //   const message: mqttMessage = {
-  //     message: configDuration.toString(),
-  //     timestamp: new Date().toISOString(),
-  //   };
-  //   client?.publish(topicConfig, JSON.stringify(message), {
-  //     retain: true,
-  //   });
-  // }, [client, topicConfig]);
 
   const onSwitchChange = useCallback(
     (checked: boolean) => {
@@ -93,8 +81,6 @@ export default function ControlItem(props: {
         clientStatus === enumClientStatus.RECONNECTED
       ) {
         sendCommand(checked);
-        // setStatus(checked ? enumSwitchStatus.HIGH : enumSwitchStatus.LOW);
-        // console.log("switch is now", checked);
       }
       setStatus(enumSwitchStatus.UNKNOWN);
     },
