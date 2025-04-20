@@ -28,6 +28,7 @@ export default function ConfigItem(props: {
   const onMessageReceived = (topic: string, payload: mqttMessage) => {
     if (topic === topicConfig) {
       const message: mqttConfigMessage = payload.message as mqttConfigMessage;
+      console.log("onMessageReceived:", message);
       if (message.duration) setConfigDuration(message.duration);
     }
   };
