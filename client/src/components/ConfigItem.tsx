@@ -68,7 +68,7 @@ export default function ConfigItem(props: {
   );
 
   return (
-    <div className="grid grid-cols-[minmax(115px,_1fr)_minmax(0,_10fr)_minmax(64px,_1fr)] gap-2 items-center">
+    <div className="grid grid-cols-[minmax(192px,_1fr)_minmax(0,_10fr)_minmax(40px,_1fr)] gap-2 items-center">
       <Label htmlFor={topicItem}>{topicItem} HIGH Duration</Label>
       <Slider
         onValueChange={([value]) => setConfigDuration(value)}
