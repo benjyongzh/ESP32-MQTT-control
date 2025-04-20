@@ -9,12 +9,10 @@ import { toast } from "sonner";
 
 export default function Login() {
   const [token, setToken] = useState("");
-  const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const navigate = useNavigate();
 
   const handleLogin = async () => {
-    setError("");
     setIsLoading(true);
     try {
       await axios.post(
@@ -27,11 +25,11 @@ export default function Login() {
     } catch (err: any) {
       console.log(err);
       if (err.response) {
-        setError(err.response.statusText);
+        const message: string = `${err.response.status}: ${err.response.statusText}`;
+        toast.error(message);
       } else {
-        setError(err.message);
+        toast.error(err.message);
       }
-      toast.error(error);
 
       setIsLoading(false);
     }
