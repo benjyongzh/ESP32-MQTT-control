@@ -12,6 +12,10 @@ import { Label } from "./ui/label";
 import { Slider } from "./ui/slider";
 import { toast } from "sonner";
 import { useMqttClient } from "./hooks/useMqttClient";
+import {
+  SWITCH_MIN_OPEN_DURATION,
+  SWITCH_MAX_OPEN_DURATION,
+} from "@/constants";
 
 export default function ConfigItem(props: {
   client: MqttClient | null;
@@ -75,8 +79,8 @@ export default function ConfigItem(props: {
         onValueCommit={() => onValueCommit()}
         value={[configDuration]}
         defaultValue={[configDuration]}
-        min={100}
-        max={5000}
+        min={SWITCH_MIN_OPEN_DURATION}
+        max={SWITCH_MAX_OPEN_DURATION}
         step={100}
         name={topicItem}
       />

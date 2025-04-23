@@ -37,8 +37,8 @@ bool mqtt_disconnection_blinker_on = false;
 
 // Default valve ON duration (ms)
 unsigned long valve_duration = 3000;
-const long valve_max_duration = 5000;
-const long valve_min_duration = 100;
+const long valve_max_duration = 20000;
+const long valve_min_duration = 500;
 bool valve_is_on = false;
 unsigned long valve_start_time = 0;
 
