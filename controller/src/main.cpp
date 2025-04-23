@@ -22,6 +22,8 @@ const char* topic_control = "irrigation/1/control";
 // MQTT topic to subscribe to
 const char* topic_config = "irrigation/1/config";
 
+const int message_timestamp_threshold = 5000;
+
 // valve status pin
 const int valve_status_pin = 32;  //23
 
@@ -174,6 +176,26 @@ void deactivateSwitch() {
   valve_is_on = false;
 }
 
+// Utility to convert ISO8601 string to epoch
+time_t iso8601ToEpoch(const char* isoString) {
+  struct tm tm;
+  if (strptime(isoString, "%Y-%m-%dT%H:%M:%S", &tm)) {
+    time_t t = mktime(&tm);
+    return t;
+  }
+  return 0;
+}
+
+bool isTimestampInRange(char* timestampStr){
+    time_t messageTime = iso8601ToEpoch(timestampStr);
+    time_t now;
+    time(&now);
+
+    Serial.printf("Message time: %ld, Current time: %ld\n", messageTime, now);
+
+    return (abs(now - messageTime) <= message_timestamp_threshold);
+}
+
 void callback(char* topic, byte* payload, unsigned int length) {
   Serial.print("Message RECEIVED [");
   Serial.print(topic);
@@ -197,6 +219,12 @@ void callback(char* topic, byte* payload, unsigned int length) {
     return;
   }
 
+  const char* messageTimestamp = doc["timestamp"];
+
+  if(!isTimestampInRange(messageTimestamp)){
+    Serial.println("Ignoring stale message");
+    return;
+  }
 
   if (String(topic) == String(topic_control)) {
     const char* messageContent = doc["message"];
