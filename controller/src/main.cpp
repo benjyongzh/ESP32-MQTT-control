@@ -16,16 +16,31 @@ const char* mqtt_user = MQTT_USERNAME;
 const char* mqtt_pass = MQTT_PASSWORD;
 
 // MQTT topic to publish to
-const char* topic_status = "irrigation/1/status";
+const char* topic_type_status = "status";
 // MQTT topic to subscribe to
-const char* topic_control = "irrigation/1/control";
+const char* topic_type_control = "control";
 // MQTT topic to subscribe to
-const char* topic_config = "irrigation/1/config";
+const char* topic_type_config = "config";
 
 const int message_timestamp_threshold = 5;
 
 // valve status pin
-const int valve_status_pin = 32;  //23
+// const int valve_status_pin = 32;  //23
+#define MAX_VALVES 4
+
+struct ValveConfig {
+  uint8_t pin;
+  unsigned long durationMs;
+  bool active;
+  unsigned long startTime;
+};
+
+ValveConfig valves[MAX_VALVES] = {
+  {14, 3000, false, 0}, // Valve 0
+  {15, 3000, false, 0}, // Valve 1
+  {17, 3000, false, 0}, // Valve 2
+  {18, 3000, false, 0}  // Valve 3
+};
 
 // wifi connection status pin
 const int wifi_connection_status_pin = 27;  //15/27
@@ -36,11 +51,8 @@ const int mqtt_connection_status_pin = 25;  //14/25
 bool mqtt_disconnection_blinker_on = false;
 
 // Default valve ON duration (ms)
-unsigned long valve_duration = 3000;
 const long valve_max_duration = 20000;
 const long valve_min_duration = 500;
-bool valve_is_on = false;
-unsigned long valve_start_time = 0;
 
 WiFiClientSecure wifiClient;
 PubSubClient client(wifiClient);
@@ -91,10 +103,14 @@ void testDNS() {
   }
 }
 
-void mqttSubscribe(const char* topic) {
-  client.subscribe(topic);
-  Serial.print("MQTT subscribed to ");
-  Serial.println(topic);
+void mqttSubscribe(const char* topic_type) {
+  char topic_fullname[64];
+  for (int i=0; i < MAX_VALVES; i++ ) {
+    snprintf(topic_fullname, sizeof(topic), "%s/%u/%s", clientId, valves[i].pin, topic_type);
+    client.subscribe(topic_fullname);
+    Serial.print("MQTT subscribed to ");
+    Serial.println(topic_fullname);
+  }
 }
 
 void connectMQTT() {
@@ -111,8 +127,8 @@ void connectMQTT() {
     delay(1000);
   }
   Serial.println("✅ MQTT connected!");
-  mqttSubscribe(topic_control);
-  mqttSubscribe(topic_config);
+  mqttSubscribe(topic_type_control);
+  mqttSubscribe(topic_type_config);
   digitalWrite(mqtt_connection_status_pin, HIGH);
 }
 
@@ -163,17 +179,22 @@ void publishCommand(const char* topic, const char* cmd) {
   }
 }
 
-void activateSwitch() {
-  digitalWrite(valve_status_pin, HIGH);
+void activateSwitch(int valveId) {
+  digitalWrite(valves[valveId].pin, HIGH);
+  // Static buffer, max length: clientId + '/' + pin (3 chars max) + '/' + messageType + '\0'
+  char topic_status[64];
+  snprintf(topic_status, sizeof(topic), "%s/%u/%s", clientId, valves[valveId].pin, topic_type_status);
   publishCommand(topic_status, "HIGH");
-  valve_is_on = true;
-  valve_start_time = millis();
+  valves[valveId].active = true;
+  valves[valveId].startTime = millis();
 }
 
-void deactivateSwitch() {
-  digitalWrite(valve_status_pin, LOW);
+void deactivateSwitch(int valveId) {
+  digitalWrite(valves[valveId].pin, LOW);
+  char topic_status[64];
+  snprintf(topic_status, sizeof(topic), "%s/%u/%s", clientId, valves[valveId].pin, topic_type_status);
   publishCommand(topic_status, "LOW");
-  valve_is_on = false;
+  valves[valveId].active = false;
 }
 
 time_t timegm_fallback(struct tm *tm) {
@@ -216,6 +237,15 @@ bool isTimestampInRange(const char* timestampStr){
     return (abs(now - messageTime) <= message_timestamp_threshold);
 }
 
+int getIdFromTopic(char* topic){
+  // TODO
+  return 0;
+}
+char getMessageTypeFromTopic(char* topic){
+  // TODO
+  return "hello";
+}
+
 void callback(char* topic, byte* payload, unsigned int length) {
   Serial.print("Message RECEIVED [");
   Serial.print(topic);
@@ -239,7 +269,10 @@ void callback(char* topic, byte* payload, unsigned int length) {
     return;
   }
 
-  if (String(topic) == String(topic_control)) {
+  int topic_id = getIdFromTopic(topic);
+  char topic_type = getMessageTypeFromTopic(topic);
+
+  if (String(topic_type) == String(topic_type_control)) {
     const char* messageTimestamp = doc["timestamp"];
     if(!isTimestampInRange(messageTimestamp)){
       Serial.println("Ignoring stale message");
@@ -248,24 +281,24 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
     const char* messageContent = doc["message"];
     if (String(messageContent) == "HIGH") {
-      activateSwitch();
+      activateSwitch(topic_id);
     } else if (String(messageContent) == "LOW") {
-      deactivateSwitch();
+      deactivateSwitch(topic_id);
     }
-  } else if (String(topic) == String(topic_config)) {
+  } else if (String(topic_type) == String(topic_type_config)) {
     // Check nested structure
     if (doc["message"]["duration"]) {
       long received_duration = doc["message"]["duration"].as<unsigned long>();
       if (received_duration > valve_max_duration) {
         Serial.printf("Received valve duration of %lus\n", received_duration);
-        valve_duration = valve_max_duration;
+        valves[topic_id].durationMs = valve_max_duration;
       } else if (received_duration < valve_min_duration) {
         Serial.printf("Received valve duration of %lus\n", received_duration);
-        valve_duration = valve_min_duration;
+        valves[topic_id].durationMs = valve_min_duration;
       } else {
-        valve_duration = received_duration;
+        valves[topic_id].durationMs = received_duration;
       }
-      Serial.printf("✅ Valve duration updated to %lus\n", valve_duration);
+      Serial.printf("✅ Valve duration for %i updated to %lus\n", topic_id, valves[topic_id].durationMs);
     } else {
       Serial.println("⚠️ JSON missing 'message.duration'");
     }
@@ -297,12 +330,14 @@ void loop() {
     client.loop();
   }
 
-  if (valve_is_on) {
-    unsigned long currentTime = millis();
-    if (currentTime - valve_start_time >= valve_duration) {
-      // Time's up, turn off the valve
-      deactivateSwitch();
-      Serial.println("Valve auto-turned off after set duration");
+  for (int i=0; i < MAX_VALVES; i++ ) {
+    if (valves[i].active == true) {
+      unsigned long currentTime = millis();
+      if (currentTime - valves[i].startTime >= valves[i].durationMs) {
+        // Time's up, turn off the valve
+        deactivateSwitch(i);
+        Serial.printf("Valve %i auto-turned off after set duration\n", i);
+      }
     }
-  }
+ }
 }
