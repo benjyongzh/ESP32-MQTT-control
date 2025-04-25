@@ -239,11 +239,31 @@ bool isTimestampInRange(const char* timestampStr){
 
 int getIdFromTopic(char* topic){
   // TODO
-  return 0;
+  char buffer[64];
+  strncpy(buffer, topic, sizeof(buffer));
+  buffer[sizeof(buffer) - 1] = '\0';
+
+  char* token;
+  char* saveptr;
+
+  token = strtok_r(buffer, "/", &saveptr);  // skip clientId
+  token = strtok_r(nullptr, "/", &saveptr); // pin
+  return token ? atoi(token) : -1;
 }
-char getMessageTypeFromTopic(char* topic){
+
+char* getMessageTypeFromTopic(char* topic){
   // TODO
-  return "hello";
+  static char buffer[64];
+  strncpy(buffer, topic, sizeof(buffer));
+  buffer[sizeof(buffer) - 1] = '\0';
+
+  char* token;
+  char* saveptr;
+
+  token = strtok_r(buffer, "/", &saveptr);  // skip clientId
+  token = strtok_r(nullptr, "/", &saveptr); // skip pin
+  token = strtok_r(nullptr, "/", &saveptr); // messageType
+  return token;
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {
@@ -270,7 +290,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
   }
 
   int topic_id = getIdFromTopic(topic);
-  char topic_type = getMessageTypeFromTopic(topic);
+  char* topic_type = getMessageTypeFromTopic(topic);
 
   if (String(topic_type) == String(topic_type_control)) {
     const char* messageTimestamp = doc["timestamp"];
