@@ -1,15 +1,15 @@
-import { mqttTopicItem, makeMqttTopicItem } from "./types";
+import { mqttTopicItem, makeMqttTopicItem, topicList } from "./types";
 
 export const getArrayOfTopicItems = (
-  topicList: Record<string, number>
+  deviceIdToTopic: Record<string, topicList>
 ): mqttTopicItem[] => {
-  const keys: string[] = Object.keys(topicList);
+  const deviceIds: string[] = Object.keys(deviceIdToTopic);
   const array: mqttTopicItem[] = [];
-  for (let i = 0; i < keys.length; i++) {
+  for (let i = 0; i < deviceIds.length; i++) {
     //looking at each key now
-    const count: number = topicList[keys[i]];
-    for (let j = 0; j < count; j++) {
-      const topicItem: mqttTopicItem = makeMqttTopicItem(keys[i], j + 1);
+    const list: topicList = deviceIdToTopic[deviceIds[i]];
+    for (let j = 0; j < list.quantity; j++) {
+      const topicItem: mqttTopicItem = makeMqttTopicItem(deviceIds[i], j + 1);
       array.push(topicItem);
     }
   }
@@ -35,3 +35,9 @@ export const dateFormatter = new Intl.DateTimeFormat("en-SG", {
 });
 // console.log(dateFormatter.format(date));
 // Example: "15 Apr 2025, 22:47:18"
+
+export const getDeviceIdFromTopicString = (
+  topicString: mqttTopicItem
+): string => {
+  return topicString.split("/")[0];
+};

@@ -33,3 +33,8 @@ export type mqttConfigMessage = {
   // add other config properties here in the future
   // e.g. pressure: number, enabled: boolean, etc.
 };
+
+export type topicList = {
+  topic: string;
+  quantity: number;
+};

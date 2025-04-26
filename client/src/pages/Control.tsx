@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import mqtt, { MqttClient } from "mqtt";
 import ControlItem from "../components/ControlItem";
 import Logo from "@/components/Logo";
-import { TOPIC_LIST } from "../constants";
+import { CONTROLLER_DEVICE_ID_TO_TOPIC } from "../constants";
 import { mqttTopicItem } from "../types";
 import { getArrayOfTopicItems } from "../utils";
 import { LoaderCircle, Bolt } from "lucide-react";
@@ -39,8 +39,8 @@ export default function Control() {
   }, []);
 
   const topicItems: mqttTopicItem[] = useMemo(
-    () => getArrayOfTopicItems(TOPIC_LIST),
-    [TOPIC_LIST]
+    () => getArrayOfTopicItems(CONTROLLER_DEVICE_ID_TO_TOPIC),
+    [CONTROLLER_DEVICE_ID_TO_TOPIC]
   );
 
   return (

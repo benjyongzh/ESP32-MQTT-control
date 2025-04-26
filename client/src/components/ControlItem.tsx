@@ -6,12 +6,18 @@ import {
   getMqttTopicId,
   enumMqttTopicType,
   mqttMessage,
+  topicList,
 } from "../types";
 import { enumClientStatus } from "../pages/Control";
-import { getEnumKeyByEnumValue, dateFormatter } from "../utils";
+import {
+  getEnumKeyByEnumValue,
+  dateFormatter,
+  getDeviceIdFromTopicString,
+} from "../utils";
 import { Switch } from "./ui/switch";
 import SwitchStatusText from "./SwitchStatusText";
 import { useMqttClient } from "./hooks/useMqttClient";
+import { CONTROLLER_DEVICE_ID_TO_TOPIC } from "@/constants";
 
 export enum enumSwitchStatus {
   LOW = "LOW",
@@ -95,13 +101,19 @@ export default function ControlItem(props: {
     [lastUpdated]
   );
 
+  const formattedTopicString: string = useMemo(() => {
+    const deviceId: string = getDeviceIdFromTopicString(topicItem);
+    const list: topicList = CONTROLLER_DEVICE_ID_TO_TOPIC[deviceId];
+    return `${list.topic}/${list.quantity}`;
+  }, [CONTROLLER_DEVICE_ID_TO_TOPIC, topicItem]);
+
   return (
     <div className="table-grid-row w-full border-b-1 border-primary-foreground py-2">
       <div className="flex items-center justify-center text-center">
         <SwitchStatusText status={status} />
       </div>
       <div className="flex flex-col justify-center gap-1">
-        <p className="text-left">{topicItem}</p>
+        <p className="text-left">{formattedTopicString}</p>
         <p className="text-left text-xs text-muted-foreground">
           Updated: {formattedDate}
         </p>

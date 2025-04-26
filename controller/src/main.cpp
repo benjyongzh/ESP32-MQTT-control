@@ -5,6 +5,9 @@
 #include <ArduinoJson.h>
 #include <secrets.h>
 
+// device ID
+char deviceId[32]; //015C
+
 // Wi-Fi
 const char* ssid = WIFI_SSID;
 const char* password = WIFI_PASSWORD;
@@ -61,6 +64,12 @@ PubSubClient client(wifiClient);
 #define GMT_OFFSET_SEC 8 * 3600
 #define DAYLIGHT_OFFSET_SEC 0
 
+
+void setDeviceId(){
+  uint64_t chipId = ESP.getEfuseMac(); // Unique ID
+  snprintf(deviceId, sizeof(deviceId), "esp32-%04X", (uint16_t)(chipId & 0xFFFF));
+};
+
 void connectWiFi() {
   Serial.print("Connecting to WiFi...");
   WiFi.begin(ssid, password);
@@ -106,7 +115,7 @@ void testDNS() {
 void mqttSubscribe(const char* topic_type) {
   char topic_fullname[64];
   for (int i=0; i < MAX_VALVES; i++ ) {
-    snprintf(topic_fullname, sizeof(topic), "%s/%u/%s", clientId, valves[i].pin, topic_type);
+    snprintf(topic_fullname, sizeof(topic_fullname), "%s/%u/%s", deviceId, valves[i].pin, topic_type);
     client.subscribe(topic_fullname);
     Serial.print("MQTT subscribed to ");
     Serial.println(topic_fullname);
@@ -115,7 +124,7 @@ void mqttSubscribe(const char* topic_type) {
 
 void connectMQTT() {
   Serial.println("📡 Attempting MQTT connection...");
-  while (!client.connect("ESP32Client", mqtt_user, mqtt_pass)) {
+  while (!client.connect(deviceId, mqtt_user, mqtt_pass)) {
     mqtt_disconnection_blinker_on = !mqtt_disconnection_blinker_on;
     Serial.print("❌ failed. mqttClientState = ");
     Serial.println(client.state());
@@ -183,7 +192,7 @@ void activateSwitch(int valveId) {
   digitalWrite(valves[valveId].pin, HIGH);
   // Static buffer, max length: clientId + '/' + pin (3 chars max) + '/' + messageType + '\0'
   char topic_status[64];
-  snprintf(topic_status, sizeof(topic), "%s/%u/%s", clientId, valves[valveId].pin, topic_type_status);
+  snprintf(topic_status, sizeof(topic_status), "%s/%u/%s", deviceId, valves[valveId].pin, topic_type_status);
   publishCommand(topic_status, "HIGH");
   valves[valveId].active = true;
   valves[valveId].startTime = millis();
@@ -192,7 +201,7 @@ void activateSwitch(int valveId) {
 void deactivateSwitch(int valveId) {
   digitalWrite(valves[valveId].pin, LOW);
   char topic_status[64];
-  snprintf(topic_status, sizeof(topic), "%s/%u/%s", clientId, valves[valveId].pin, topic_type_status);
+  snprintf(topic_status, sizeof(topic_status), "%s/%u/%s", deviceId, valves[valveId].pin, topic_type_status);
   publishCommand(topic_status, "LOW");
   valves[valveId].active = false;
 }
@@ -329,8 +338,11 @@ void setup() {
   Serial.begin(115200);
   pinMode(wifi_connection_status_pin, OUTPUT);
   pinMode(mqtt_connection_status_pin, OUTPUT);
-  pinMode(valve_status_pin, OUTPUT);
+  for (int i=0; i < MAX_VALVES; i++ ) {
+    pinMode(valves[i].pin, OUTPUT);
+  }
 
+  setDeviceId();
   connectWiFi();
   setTime();
 
