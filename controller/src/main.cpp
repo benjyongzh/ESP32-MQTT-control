@@ -39,7 +39,7 @@ struct ValveConfig {
 };
 
 ValveConfig valves[MAX_VALVES] = {
-  {14, 3000, false, 0}, // Valve 0
+  {32, 3000, false, 0}, // Valve 0
   {15, 3000, false, 0}, // Valve 1
   {17, 3000, false, 0}, // Valve 2
   {18, 3000, false, 0}  // Valve 3
@@ -115,7 +115,7 @@ void testDNS() {
 void mqttSubscribe(const char* topic_type) {
   char topic_fullname[64];
   for (int i=0; i < MAX_VALVES; i++ ) {
-    snprintf(topic_fullname, sizeof(topic_fullname), "%s/%u/%s", deviceId, valves[i].pin, topic_type);
+    snprintf(topic_fullname, sizeof(topic_fullname), "%s/%i/%s", deviceId, i+1, topic_type);
     client.subscribe(topic_fullname);
     Serial.print("MQTT subscribed to ");
     Serial.println(topic_fullname);
@@ -188,22 +188,22 @@ void publishCommand(const char* topic, const char* cmd) {
   }
 }
 
-void activateSwitch(int valveId) {
-  digitalWrite(valves[valveId].pin, HIGH);
+void activateSwitch(int valveIdInTopic) {
+  digitalWrite(valves[valveIdInTopic-1].pin, HIGH);
   // Static buffer, max length: clientId + '/' + pin (3 chars max) + '/' + messageType + '\0'
   char topic_status[64];
-  snprintf(topic_status, sizeof(topic_status), "%s/%u/%s", deviceId, valves[valveId].pin, topic_type_status);
+  snprintf(topic_status, sizeof(topic_status), "%s/%i/%s", deviceId, valveIdInTopic, topic_type_status);
   publishCommand(topic_status, "HIGH");
-  valves[valveId].active = true;
-  valves[valveId].startTime = millis();
+  valves[valveIdInTopic].active = true;
+  valves[valveIdInTopic].startTime = millis();
 }
 
-void deactivateSwitch(int valveId) {
-  digitalWrite(valves[valveId].pin, LOW);
+void deactivateSwitch(int valveIdInTopic) {
+  digitalWrite(valves[valveIdInTopic-1].pin, LOW);
   char topic_status[64];
-  snprintf(topic_status, sizeof(topic_status), "%s/%u/%s", deviceId, valves[valveId].pin, topic_type_status);
+  snprintf(topic_status, sizeof(topic_status), "%s/%i/%s", deviceId, valveIdInTopic, topic_type_status);
   publishCommand(topic_status, "LOW");
-  valves[valveId].active = false;
+  valves[valveIdInTopic].active = false;
 }
 
 time_t timegm_fallback(struct tm *tm) {
