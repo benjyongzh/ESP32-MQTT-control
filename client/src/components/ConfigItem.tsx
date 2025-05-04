@@ -79,19 +79,23 @@ export default function ConfigItem(props: {
   );
 
   return (
-    <div className="grid grid-cols-[minmax(128px,_1fr)_minmax(_1fr,_10fr)_minmax(40px,_1fr)] gap-1 items-center">
+    // <div className="grid grid-cols-[minmax(128px,_1fr)_minmax(_1fr,_10fr)_minmax(40px,_1fr)] gap-1 items-center">
+    <div className="flex flex-col items-start justify-center">
       <Label htmlFor={topicItem}>{formattedTopicString}</Label>
-      <Slider
-        onValueChange={([value]) => setConfigDuration(value)}
-        onValueCommit={() => onValueCommit()}
-        value={[configDuration]}
-        defaultValue={[configDuration]}
-        min={SWITCH_MIN_OPEN_DURATION}
-        max={SWITCH_MAX_OPEN_DURATION}
-        step={100}
-        name={topicItem}
-      />
-      <p className="text-right">{displayedDuration} s</p>
+      <div className="flex gap-1 w-full">
+        <Slider
+          onValueChange={([value]) => setConfigDuration(value)}
+          onValueCommit={() => onValueCommit()}
+          value={[configDuration]}
+          defaultValue={[configDuration]}
+          min={SWITCH_MIN_OPEN_DURATION}
+          max={SWITCH_MAX_OPEN_DURATION}
+          step={100}
+          name={topicItem}
+          className="flex-5"
+        />
+        <p className="text-right flex-1">{displayedDuration} s</p>
+      </div>
     </div>
   );
 }
