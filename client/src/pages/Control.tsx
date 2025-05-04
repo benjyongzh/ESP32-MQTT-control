@@ -55,7 +55,7 @@ export default function Control() {
           <DialogHeader>
             <DialogTitle className="text-left">Configuration</DialogTitle>
             <DialogDescription className="text-left">
-              Make changes to HIGH duration settings for each valve here
+              Make changes to HIGH duration for each valve here
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col items-stretch justify-between gap-4 mt-4">

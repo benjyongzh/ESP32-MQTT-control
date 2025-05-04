@@ -102,9 +102,9 @@ export default function ControlItem(props: {
   );
 
   const formattedTopicString: string = useMemo(() => {
-    const deviceId: string = getDeviceIdFromTopicString(topicItem);
+    const [deviceId, index] = topicItem.split("/");
     const list: topicList = CONTROLLER_DEVICE_ID_TO_TOPIC[deviceId];
-    return `${list.topic}/${list.quantity}`;
+    return `${list.topic}/${index}`;
   }, [CONTROLLER_DEVICE_ID_TO_TOPIC, topicItem]);
 
   return (
