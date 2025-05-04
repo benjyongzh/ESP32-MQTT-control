@@ -4,9 +4,11 @@
 #include <time.h>
 #include <ArduinoJson.h>
 #include <secrets.h>
+#include <EEPROM.h>
 
 // device ID
-char deviceId[32]; //015C
+#define EEPROM_SIZE 8
+char deviceId[32];
 
 // Wi-Fi
 const char* ssid = WIFI_SSID;
@@ -64,10 +66,28 @@ PubSubClient client(wifiClient);
 #define GMT_OFFSET_SEC 8 * 3600
 #define DAYLIGHT_OFFSET_SEC 0
 
+uint16_t getOrCreateDeviceId() {
+  uint16_t id;
+  EEPROM.begin(EEPROM_SIZE);
+  EEPROM.get(0, id);
+
+  if (id == 0xFFFF || id == 0) {
+    id = esp_random();
+    EEPROM.put(0, id);
+    EEPROM.commit();
+  }
+
+  return id;
+}
 
 void setDeviceId(){
-  uint64_t chipId = ESP.getEfuseMac(); // Unique ID
-  snprintf(deviceId, sizeof(deviceId), "esp32-%04X", (uint16_t)(chipId & 0xFFFF));
+  // uint64_t chipId = ESP.getEfuseMac(); // Unique ID 015C
+  uint16_t randomId = getOrCreateDeviceId();
+  // snprintf(deviceId, sizeof(deviceId), "esp32-%04X-%04X", (uint16_t)(chipId & 0xFFFF), randomId); 
+  snprintf(deviceId, sizeof(deviceId), "esp32-%04X", randomId);
+  Serial.print("deviceId: ");
+  Serial.println(deviceId);
+
 };
 
 void connectWiFi() {
