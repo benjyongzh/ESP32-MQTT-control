@@ -1,4 +1,5 @@
 import { mqttTopicItem, makeMqttTopicItem, topicList } from "./types";
+import { CONTROLLER_DEVICE_ID_TO_TOPIC } from "./constants";
 
 export const getArrayOfTopicItems = (
   deviceIdToTopic: Record<string, topicList>
@@ -36,8 +37,10 @@ export const dateFormatter = new Intl.DateTimeFormat("en-SG", {
 // console.log(dateFormatter.format(date));
 // Example: "15 Apr 2025, 22:47:18"
 
-export const getDeviceIdFromTopicString = (
+export const formatTopicFromTopicString = (
   topicString: mqttTopicItem
 ): string => {
-  return topicString.split("/")[0];
+  const [deviceId, index] = topicString.split("/");
+  const list: topicList = CONTROLLER_DEVICE_ID_TO_TOPIC[deviceId];
+  return `${list.topic}/${index}`;
 };

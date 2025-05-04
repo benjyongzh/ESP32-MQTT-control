@@ -15,7 +15,9 @@ import { useMqttClient } from "./hooks/useMqttClient";
 import {
   SWITCH_MIN_OPEN_DURATION,
   SWITCH_MAX_OPEN_DURATION,
+  CONTROLLER_DEVICE_ID_TO_TOPIC,
 } from "@/constants";
+import { formatTopicFromTopicString } from "@/utils";
 
 export default function ConfigItem(props: {
   client: MqttClient | null;
@@ -71,9 +73,14 @@ export default function ConfigItem(props: {
     [configDuration]
   );
 
+  const formattedTopicString: string = useMemo(
+    () => formatTopicFromTopicString(topicItem),
+    [CONTROLLER_DEVICE_ID_TO_TOPIC, topicItem]
+  );
+
   return (
-    <div className="grid grid-cols-[minmax(192px,_1fr)_minmax(0,_10fr)_minmax(40px,_1fr)] gap-2 items-center">
-      <Label htmlFor={topicItem}>{topicItem}</Label>
+    <div className="grid grid-cols-[minmax(128px,_1fr)_minmax(_1fr,_10fr)_minmax(40px,_1fr)] gap-1 items-center">
+      <Label htmlFor={topicItem}>{formattedTopicString}</Label>
       <Slider
         onValueChange={([value]) => setConfigDuration(value)}
         onValueCommit={() => onValueCommit()}

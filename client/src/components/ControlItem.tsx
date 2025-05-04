@@ -12,7 +12,7 @@ import { enumClientStatus } from "../pages/Control";
 import {
   getEnumKeyByEnumValue,
   dateFormatter,
-  getDeviceIdFromTopicString,
+  formatTopicFromTopicString,
 } from "../utils";
 import { Switch } from "./ui/switch";
 import SwitchStatusText from "./SwitchStatusText";
@@ -101,11 +101,10 @@ export default function ControlItem(props: {
     [lastUpdated]
   );
 
-  const formattedTopicString: string = useMemo(() => {
-    const [deviceId, index] = topicItem.split("/");
-    const list: topicList = CONTROLLER_DEVICE_ID_TO_TOPIC[deviceId];
-    return `${list.topic}/${index}`;
-  }, [CONTROLLER_DEVICE_ID_TO_TOPIC, topicItem]);
+  const formattedTopicString: string = useMemo(
+    () => formatTopicFromTopicString(topicItem),
+    [CONTROLLER_DEVICE_ID_TO_TOPIC, topicItem]
+  );
 
   return (
     <div className="table-grid-row w-full border-b-1 border-primary-foreground py-2">
