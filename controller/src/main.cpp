@@ -63,7 +63,7 @@ WiFiClientSecure wifiClient;
 PubSubClient client(wifiClient);
 
 // Time config (UTC+8 for example)
-#define GMT_OFFSET_SEC 8 * 3600
+#define GMT_OFFSET_SEC 0//8 * 3600
 #define DAYLIGHT_OFFSET_SEC 0
 
 uint16_t getOrCreateDeviceId() {
