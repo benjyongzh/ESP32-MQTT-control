@@ -80,7 +80,7 @@ export default function ConfigItem(props: {
 
   return (
     // <div className="grid grid-cols-[minmax(128px,_1fr)_minmax(_1fr,_10fr)_minmax(40px,_1fr)] gap-1 items-center">
-    <div className="flex flex-col items-start justify-center">
+    <div className="flex flex-col items-start justify-center gap-2">
       <Label htmlFor={topicItem}>{formattedTopicString}</Label>
       <div className="flex gap-1 w-full">
         <Slider

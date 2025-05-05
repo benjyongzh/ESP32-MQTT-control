@@ -55,10 +55,10 @@ export default function Control() {
           <DialogHeader>
             <DialogTitle className="text-left">Configuration</DialogTitle>
             <DialogDescription className="text-left">
-              Make changes to HIGH duration for each valve here
+              Set desired HIGH duration for each topic
             </DialogDescription>
           </DialogHeader>
-          <div className="flex flex-col items-stretch justify-between gap-4 mt-4">
+          <div className="flex flex-col items-stretch justify-between gap-6 mt-4">
             {topicItems.map((topic) => (
               <ConfigItem key={topic} client={client} topicItem={topic} />
             ))}
