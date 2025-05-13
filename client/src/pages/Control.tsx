@@ -45,7 +45,7 @@ export default function Control() {
 
   return (
     <div className="base relative">
-      <Dialog>
+      {/* <Dialog>
         <DialogTrigger asChild>
           <Button variant={"ghost"} className="absolute right-3">
             <Bolt />
@@ -64,7 +64,7 @@ export default function Control() {
             ))}
           </div>
         </DialogContent>
-      </Dialog>
+      </Dialog> */}
       <div className="mt-42">
         <Logo />
       </div>

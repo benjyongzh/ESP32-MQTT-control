@@ -7,6 +7,7 @@ import {
   enumMqttTopicType,
   mqttMessage,
   topicList,
+  mqttHealthMessage,
 } from "../types";
 import { enumClientStatus } from "../pages/Control";
 import {
@@ -18,6 +19,14 @@ import { Switch } from "./ui/switch";
 import SwitchStatusText from "./SwitchStatusText";
 import { useMqttClient } from "./hooks/useMqttClient";
 import { CONTROLLER_DEVICE_ID_TO_TOPIC } from "@/constants";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import ConfigItem from "./ConfigItem";
 
 export enum enumSwitchStatus {
   LOW = "LOW",
@@ -41,6 +50,10 @@ export default function ControlItem(props: {
         setStatus(enumSwitchStatus[key as keyof typeof enumSwitchStatus]);
         setLastUpdated(payload.timestamp);
       }
+    } else if (topic === topicHealth) {
+      const msg: mqttHealthMessage = payload.message as mqttHealthMessage;
+      setIpAddress(msg.ipAddress);
+      setHealthLastUpdated(payload.timestamp);
     }
   };
 
@@ -52,14 +65,21 @@ export default function ControlItem(props: {
     () => getMqttTopicId(topicItem, enumMqttTopicType.STATUS),
     [topicItem]
   );
+  const topicHealth: mqttTopicId = useMemo(
+    () => getMqttTopicId(topicItem, enumMqttTopicType.HEALTH),
+    [topicItem]
+  );
 
   const { clientStatus } = useMqttClient({
     mqttClient: client,
-    topics: [topicControl, topicStatus],
+    topics: [topicControl, topicStatus, topicHealth],
     onMessage: onMessageReceived,
   });
   const [status, setStatus] = useState<enumSwitchStatus>(enumSwitchStatus.LOW);
   const [lastUpdated, setLastUpdated] = useState<string>("unregistered");
+  const [ipAddress, setIpAddress] = useState<string>("unregistered");
+  const [healthLastUpdated, setHealthLastUpdated] =
+    useState<string>("unregistered");
 
   useEffect(() => {
     if (clientStatus === enumClientStatus.ERROR) {
@@ -93,12 +113,18 @@ export default function ControlItem(props: {
     [clientStatus, sendCommand]
   );
 
-  const formattedDate: string = useMemo(
-    () =>
-      lastUpdated === "unregistered"
-        ? lastUpdated
-        : dateFormatter.format(new Date(lastUpdated)),
-    [lastUpdated]
+  // const formattedDate: string = useMemo(
+  //   () =>
+  //     lastUpdated === "unregistered"
+  //       ? lastUpdated
+  //       : dateFormatter.format(new Date(lastUpdated)),
+  //   [lastUpdated]
+  // );
+
+  const formattedDate = useCallback(
+    (date: string) =>
+      date === "unregistered" ? date : dateFormatter.format(new Date(date)),
+    []
   );
 
   const formattedTopicString: string = useMemo(
@@ -111,11 +137,50 @@ export default function ControlItem(props: {
       <div className="flex items-center justify-center text-center">
         <SwitchStatusText status={status} />
       </div>
-      <div className="flex flex-col justify-center gap-1">
-        <p className="text-left">{formattedTopicString}</p>
-        <p className="text-left text-xs text-muted-foreground">
-          Updated: {formattedDate}
-        </p>
+      <div className="flex justify-start">
+        <Dialog>
+          <DialogTrigger asChild>
+            <div className="flex w-full justify-start items-center">
+              {formattedTopicString}
+            </div>
+          </DialogTrigger>
+          <DialogContent className="max-w-xs md:max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="text-left">
+                {formattedTopicString}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex flex-col items-stretch justify-between mt-3">
+              <section className="flex flex-col items-stretch justify-between mb-1 pb-2">
+                <h3 className="mb-2 font-bold">System Info</h3>
+                <div className="grid grid-cols-2 gap-1">
+                  <div className="text-right after:content-[':']">
+                    IP Address
+                  </div>
+                  <div className="text-left">{ipAddress}</div>
+                  <div className="text-right after:content-[':']">
+                    MQTT Topic
+                  </div>
+                  <div className="text-left">{topicItem}</div>
+                  <div className="text-right after:content-[':']">
+                    Last Message
+                  </div>
+                  <div className="text-left">{formattedDate(lastUpdated)}</div>
+                  <div className="text-right after:content-[':']">
+                    Controller Health
+                  </div>
+                  <div className="text-left">
+                    {formattedDate(healthLastUpdated)}
+                  </div>
+                </div>
+              </section>
+              <section className="flex flex-col items-stretch justify-between gap-2 mt-1 pt-2 border-t-2 border-t-primary-foreground">
+                <h3 className="mb-2 font-bold">Config</h3>
+                <ConfigItem client={client} topicItem={topicItem} />
+              </section>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="flex items-center justify-center text-center">
