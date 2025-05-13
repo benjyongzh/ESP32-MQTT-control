@@ -26,8 +26,14 @@ const char* topic_type_status = "status";
 const char* topic_type_control = "control";
 // MQTT topic to subscribe to
 const char* topic_type_config = "config";
+// MQTT topic to publish to
+const char* topic_type_health = "controllerhealth";
 
 const int message_timestamp_threshold = 5;
+
+// system health check
+unsigned long lastHealthPublish = 0;
+const unsigned long healthInterval = 5 * 60 * 1000; // 5 minutes
 
 // valve status pin
 // const int valve_status_pin = 32;  //23
@@ -354,6 +360,29 @@ void callback(char* topic, byte* payload, unsigned int length) {
   }
 }
 
+void publishHealthStatus() {
+  IPAddress ip = WiFi.localIP();
+  char ipStr[16];
+  snprintf(ipStr, sizeof(ipStr), "%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
+
+  JsonDocument doc;
+  doc["ip"] = ipStr;
+  doc["timestamp"] = getCurrentTimestamp();  // Your existing timestamp function
+
+  char topic[64];
+  snprintf(topic, sizeof(topic), "%s/%s", deviceId, topic_type_health);
+
+  char payload[128];
+  serializeJson(doc, payload);
+
+  bool ok = client.publish(topic, payload, true);
+  if (ok) {
+    Serial.printf("📡 Health ping sent to %s: %s\n", topic, payload);
+  } else {
+    Serial.println("❌ Failed to publish health status");
+  }
+}
+
 void setup() {
   Serial.begin(115200);
   pinMode(wifi_connection_status_pin, OUTPUT);
@@ -392,4 +421,10 @@ void loop() {
       }
     }
  }
+
+//  system health
+ if (millis() - lastHealthPublish >= healthInterval) {
+  publishHealthStatus();
+  lastHealthPublish = millis();
+}
 }
