@@ -16,6 +16,8 @@ import {
   SWITCH_MIN_OPEN_DURATION,
   SWITCH_MAX_OPEN_DURATION,
   CONTROLLER_DEVICE_ID_TO_TOPIC,
+  HEARTBEAT_INTERVAL_MIN,
+  HEARTBEAT_INTERVAL_MAX,
 } from "@/constants";
 import { formatTopicFromTopicString } from "@/utils";
 
@@ -66,7 +68,7 @@ export default function ConfigItem(props: {
       retain: true,
     });
     toast.success(topicConfig, {
-      description: `Duration updated to ${displayedHighDuration} seconds`,
+      description: `HIGH duration updated to ${displayedHighDuration} seconds\nHeartbeat interval updated to ${heartbeatIntervalDuration} minutes`,
     });
   }, [client, highDuration, topicConfig]);
 
@@ -82,7 +84,7 @@ export default function ConfigItem(props: {
 
   return (
     <div className="flex flex-col items-start justify-center gap-3">
-      <div className="flex flex-col items-start justify-center gap-2">
+      <div className="flex flex-col items-start justify-center gap-2 w-full">
         <Label htmlFor={topicItem}>HIGH Duration</Label>
         <div className="flex gap-1 w-full">
           <Slider
@@ -94,12 +96,12 @@ export default function ConfigItem(props: {
             max={SWITCH_MAX_OPEN_DURATION}
             step={100}
             name={topicItem}
-            className="flex-5"
+            className="flex-3"
           />
-          <p className="text-right flex-1">{displayedHighDuration} s</p>
+          <p className="text-left flex-1">{displayedHighDuration} s</p>
         </div>
       </div>
-      <div className="flex flex-col items-start justify-center gap-2">
+      <div className="flex flex-col items-start justify-center gap-2 w-full">
         <Label htmlFor={topicItem}>Heartbeat Interval</Label>
         <div className="flex gap-1 w-full">
           <Slider
@@ -107,13 +109,13 @@ export default function ConfigItem(props: {
             onValueCommit={() => onValueCommit()}
             value={[heartbeatIntervalDuration]}
             defaultValue={[heartbeatIntervalDuration]}
-            min={SWITCH_MIN_OPEN_DURATION}
-            max={SWITCH_MAX_OPEN_DURATION}
+            min={HEARTBEAT_INTERVAL_MIN}
+            max={HEARTBEAT_INTERVAL_MAX}
             step={0.1}
             name={topicItem}
-            className="flex-5"
+            className="flex-3"
           />
-          <p className="text-right flex-1">
+          <p className="text-left flex-1">
             {heartbeatIntervalDuration.toFixed(1)} min
           </p>
         </div>
