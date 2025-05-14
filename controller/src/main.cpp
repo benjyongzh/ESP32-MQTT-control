@@ -348,15 +348,15 @@ void callback(char* topic, byte* payload, unsigned int length) {
     if (doc["message"]["highDuration"]) {
       long received_duration = doc["message"]["highDuration"].as<unsigned long>();
       if (received_duration > valve_max_duration) {
-        Serial.printf("Received valve duration of %lus\n", received_duration);
+        Serial.printf("Received valve duration of %lums\n", received_duration);
         valves[topic_id].durationMs = valve_max_duration;
       } else if (received_duration < valve_min_duration) {
-        Serial.printf("Received valve duration of %lus\n", received_duration);
+        Serial.printf("Received valve duration of %lums\n", received_duration);
         valves[topic_id].durationMs = valve_min_duration;
       } else {
         valves[topic_id].durationMs = received_duration;
       }
-      Serial.printf("✅ Valve duration for %i updated to %lus\n", topic_id, valves[topic_id].durationMs);
+      Serial.printf("✅ Valve duration for index %i updated to %lums\n", topic_id, valves[topic_id].durationMs);
     } else {
       Serial.println("⚠️ JSON missing 'message.highDuration'");
     }
@@ -364,15 +364,15 @@ void callback(char* topic, byte* payload, unsigned int length) {
     if (doc["message"]["heartbeatInterval"]) {
       long received_duration = doc["message"]["heartbeatInterval"].as<unsigned long>();
       if (received_duration > healthInterval_max_duration) {
-        Serial.printf("Received heartbeat interval duration of %lus\n", received_duration);
+        Serial.printf("Received heartbeat interval duration of %luminutes\n", received_duration);
         healthInterval = healthInterval_max_duration;
       } else if (received_duration < healthInterval_min_duration) {
-        Serial.printf("Received heartbeat interval  duration of %lus\n", received_duration);
+        Serial.printf("Received heartbeat interval duration of %luminutes\n", received_duration);
         healthInterval = healthInterval_min_duration;
       } else {
         healthInterval = received_duration;
       }
-      Serial.printf("✅ Heartbeat interval duration for %i updated to %lus\n", topic_id, healthInterval);
+      Serial.printf("✅ Heartbeat interval duration for index %i updated to %luminutes\n", topic_id, healthInterval);
     } else {
       Serial.println("⚠️ JSON missing 'message.heartbeatInterval'");
     }

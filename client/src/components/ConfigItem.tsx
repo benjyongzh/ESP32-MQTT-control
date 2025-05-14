@@ -68,9 +68,9 @@ export default function ConfigItem(props: {
       retain: true,
     });
     toast.success(topicConfig, {
-      description: `HIGH duration updated to ${displayedHighDuration} seconds\nHeartbeat interval updated to ${heartbeatIntervalDuration} minutes`,
+      description: `HIGH duration updated to ${displayedHighDuration} seconds, and Heartbeat interval updated to ${heartbeatIntervalDuration} minutes`,
     });
-  }, [client, highDuration, topicConfig]);
+  }, [client, highDuration, heartbeatIntervalDuration, topicConfig]);
 
   const displayedHighDuration = useMemo(
     () => (highDuration / 1000).toFixed(1),
@@ -86,7 +86,7 @@ export default function ConfigItem(props: {
     <div className="flex flex-col items-start justify-center gap-3">
       <div className="flex flex-col items-start justify-center gap-2 w-full">
         <Label htmlFor={topicItem}>HIGH Duration</Label>
-        <div className="flex gap-1 w-full">
+        <div className="flex gap-2 w-full">
           <Slider
             onValueChange={([value]) => setHighDuration(value)}
             onValueCommit={() => onValueCommit()}
@@ -103,7 +103,7 @@ export default function ConfigItem(props: {
       </div>
       <div className="flex flex-col items-start justify-center gap-2 w-full">
         <Label htmlFor={topicItem}>Heartbeat Interval</Label>
-        <div className="flex gap-1 w-full">
+        <div className="flex gap-2 w-full">
           <Slider
             onValueChange={([value]) => setHeartbeatIntervalDuration(value)}
             onValueCommit={() => onValueCommit()}
