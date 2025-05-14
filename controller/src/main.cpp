@@ -33,7 +33,7 @@ const int message_timestamp_threshold = 5;
 
 // system health check
 unsigned long lastHealthPublish = 0;
-const unsigned long healthInterval = 5 * 60 * 1000; // 5 minutes
+const unsigned long healthInterval = 1 * 6 * 1000; // 5 minutes
 
 // valve status pin
 // const int valve_status_pin = 32;  //23
@@ -366,20 +366,15 @@ void publishHealthStatus() {
   snprintf(ipStr, sizeof(ipStr), "%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
 
   JsonDocument doc;
-  doc["ip"] = ipStr;
-  doc["timestamp"] = getCurrentTimestamp();  // Your existing timestamp function
-
-  char topic[64];
-  snprintf(topic, sizeof(topic), "%s/%s", deviceId, topic_type_health);
+  doc["ipAddress"] = ipStr;
 
   char payload[128];
   serializeJson(doc, payload);
 
-  bool ok = client.publish(topic, payload, true);
-  if (ok) {
-    Serial.printf("📡 Health ping sent to %s: %s\n", topic, payload);
-  } else {
-    Serial.println("❌ Failed to publish health status");
+  for (int i=0; i < MAX_VALVES; i++ ) {
+    char topic[64];
+    snprintf(topic, sizeof(topic), "%s/%i/%s", deviceId, i+1, topic_type_health);
+    publishCommand(topic, payload);
   }
 }
 

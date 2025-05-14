@@ -6,7 +6,6 @@ import {
   getMqttTopicId,
   enumMqttTopicType,
   mqttMessage,
-  topicList,
   mqttHealthMessage,
 } from "../types";
 import { enumClientStatus } from "../pages/Control";
@@ -51,7 +50,7 @@ export default function ControlItem(props: {
         setLastUpdated(payload.timestamp);
       }
     } else if (topic === topicHealth) {
-      const msg: mqttHealthMessage = payload.message as mqttHealthMessage;
+      const msg: mqttHealthMessage = JSON.parse(payload.message as string);
       setIpAddress(msg.ipAddress);
       setHealthLastUpdated(payload.timestamp);
     }
@@ -76,10 +75,9 @@ export default function ControlItem(props: {
     onMessage: onMessageReceived,
   });
   const [status, setStatus] = useState<enumSwitchStatus>(enumSwitchStatus.LOW);
-  const [lastUpdated, setLastUpdated] = useState<string>("unregistered");
-  const [ipAddress, setIpAddress] = useState<string>("unregistered");
-  const [healthLastUpdated, setHealthLastUpdated] =
-    useState<string>("unregistered");
+  const [lastUpdated, setLastUpdated] = useState<string>("Unregistered");
+  const [ipAddress, setIpAddress] = useState<string>("Unknown");
+  const [healthLastUpdated, setHealthLastUpdated] = useState<string>("Unknown");
 
   useEffect(() => {
     if (clientStatus === enumClientStatus.ERROR) {
@@ -115,7 +113,7 @@ export default function ControlItem(props: {
 
   const formattedDateLastActivity: string = useMemo(
     () =>
-      lastUpdated === "unregistered"
+      lastUpdated === "Unregistered"
         ? lastUpdated
         : dateFormatter.format(new Date(lastUpdated)),
     [lastUpdated]
@@ -123,7 +121,7 @@ export default function ControlItem(props: {
 
   const formattedDateHealth: string = useMemo(
     () =>
-      healthLastUpdated === "unregistered"
+      healthLastUpdated === "Unknown"
         ? healthLastUpdated
         : dateFormatter.format(new Date(healthLastUpdated)),
     [healthLastUpdated]
@@ -169,7 +167,7 @@ export default function ControlItem(props: {
                   </div>
                   <div className="text-left">{formattedDateLastActivity}</div>
                   <div className="text-right after:content-[':']">
-                    Controller Health
+                    Last heartbeat
                   </div>
                   <div className="text-left">{formattedDateHealth}</div>
                 </div>

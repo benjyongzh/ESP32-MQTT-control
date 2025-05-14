@@ -6,16 +6,6 @@ import { CONTROLLER_DEVICE_ID_TO_TOPIC } from "../constants";
 import { mqttTopicItem } from "../types";
 import { getArrayOfTopicItems } from "../utils";
 import { LoaderCircle, Bolt } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import ConfigItem from "@/components/ConfigItem";
 import { useMqttClient } from "@/components/hooks/useMqttClient";
 
 export enum enumClientStatus {
