@@ -101,7 +101,7 @@ export default function ConfigItem(props: {
     <div className="flex flex-col items-start justify-center gap-3">
       <div
         className={`flex flex-col items-start justify-center gap-2 w-full ${
-          showHighDuration ? "hidden" : ""
+          showHighDuration ? "" : "hidden"
         }`}
       >
         <Label htmlFor={topicItem}>HIGH Duration</Label>

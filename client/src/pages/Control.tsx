@@ -56,14 +56,16 @@ export default function Control() {
             <DialogTitle className="text-left">Main Config</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col items-stretch justify-between gap-6 mt-4">
-            Show HIGH duration config
-            <div className="flex items-center justify-center text-center">
-              <Switch
-                checked={showHighDuration}
-                onCheckedChange={(checked: boolean) =>
-                  setShowHighDuration(checked)
-                }
-              />
+            <div className="flex justify-between items-center">
+              <p>Show HIGH duration config</p>
+              <div className="flex items-center justify-center text-center">
+                <Switch
+                  checked={showHighDuration}
+                  onCheckedChange={(checked: boolean) =>
+                    setShowHighDuration(checked)
+                  }
+                />
+              </div>
             </div>
           </div>
         </DialogContent>
