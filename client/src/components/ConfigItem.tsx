@@ -24,8 +24,9 @@ import { formatTopicFromTopicString } from "@/utils";
 export default function ConfigItem(props: {
   client: MqttClient | null;
   topicItem: mqttTopicItem;
+  showHighDuration: boolean;
 }) {
-  const { client, topicItem } = props;
+  const { client, topicItem, showHighDuration } = props;
   const [highDuration, setHighDuration] = useState<number>(3000); //milleseconds
   const [heartbeatIntervalDuration, setHeartbeatIntervalDuration] =
     useState<number>(5); //minutes
@@ -58,9 +59,9 @@ export default function ConfigItem(props: {
     });
   }, [clientStatus]);
 
-  const onValueCommit = useCallback(() => {
+  const onHighDurationCommit = useCallback(() => {
     const message: mqttMessage = {
-      message: { highDuration, heartbeatInterval: heartbeatIntervalDuration },
+      message: { highDuration },
       timestamp: new Date().toISOString(),
     };
     console.log("message to publish: ", topicConfig, message);
@@ -68,9 +69,23 @@ export default function ConfigItem(props: {
       retain: true,
     });
     toast.success(topicConfig, {
-      description: `HIGH duration updated to ${displayedHighDuration} seconds, and Heartbeat interval updated to ${heartbeatIntervalDuration} minutes`,
+      description: `HIGH duration updated to ${displayedHighDuration} seconds`,
     });
-  }, [client, highDuration, heartbeatIntervalDuration, topicConfig]);
+  }, [client, highDuration, topicConfig]);
+
+  const onHeartbeatIntervalCommit = useCallback(() => {
+    const message: mqttMessage = {
+      message: { heartbeatInterval: heartbeatIntervalDuration },
+      timestamp: new Date().toISOString(),
+    };
+    console.log("message to publish: ", topicConfig, message);
+    client?.publish(topicConfig, JSON.stringify(message), {
+      retain: true,
+    });
+    toast.success(topicConfig, {
+      description: `Heartbeat interval updated to ${heartbeatIntervalDuration} minutes`,
+    });
+  }, [client, heartbeatIntervalDuration, topicConfig]);
 
   const displayedHighDuration = useMemo(
     () => (highDuration / 1000).toFixed(1),
@@ -84,12 +99,16 @@ export default function ConfigItem(props: {
 
   return (
     <div className="flex flex-col items-start justify-center gap-3">
-      <div className="flex flex-col items-start justify-center gap-2 w-full">
+      <div
+        className={`flex flex-col items-start justify-center gap-2 w-full ${
+          showHighDuration ? "hidden" : ""
+        }`}
+      >
         <Label htmlFor={topicItem}>HIGH Duration</Label>
         <div className="flex gap-2 w-full">
           <Slider
             onValueChange={([value]) => setHighDuration(value)}
-            onValueCommit={() => onValueCommit()}
+            onValueCommit={() => onHighDurationCommit()}
             value={[highDuration]}
             defaultValue={[highDuration]}
             min={SWITCH_MIN_OPEN_DURATION}
@@ -106,7 +125,7 @@ export default function ConfigItem(props: {
         <div className="flex gap-2 w-full">
           <Slider
             onValueChange={([value]) => setHeartbeatIntervalDuration(value)}
-            onValueCommit={() => onValueCommit()}
+            onValueCommit={() => onHeartbeatIntervalCommit()}
             value={[heartbeatIntervalDuration]}
             defaultValue={[heartbeatIntervalDuration]}
             min={HEARTBEAT_INTERVAL_MIN}

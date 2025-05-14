@@ -7,6 +7,15 @@ import { mqttTopicItem } from "../types";
 import { getArrayOfTopicItems } from "../utils";
 import { LoaderCircle, Bolt } from "lucide-react";
 import { useMqttClient } from "@/components/hooks/useMqttClient";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 
 export enum enumClientStatus {
   CONNECTED = "Connected",
@@ -18,6 +27,7 @@ export enum enumClientStatus {
 export default function Control() {
   const [client, setClient] = useState<MqttClient | null>(null);
   const { clientStatus } = useMqttClient({ mqttClient: client });
+  const [showHighDuration, setShowHighDuration] = useState<boolean>(false); //minutes
 
   useEffect(() => {
     const mqttClient = mqtt.connect(import.meta.env.VITE_MQTT_CLUSTER_URL, {
@@ -35,7 +45,7 @@ export default function Control() {
 
   return (
     <div className="base relative">
-      {/* <Dialog>
+      <Dialog>
         <DialogTrigger asChild>
           <Button variant={"ghost"} className="absolute right-3">
             <Bolt />
@@ -43,18 +53,21 @@ export default function Control() {
         </DialogTrigger>
         <DialogContent className="max-w-xs md:max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-left">Configuration</DialogTitle>
-            <DialogDescription className="text-left">
-              Set desired HIGH duration for each topic
-            </DialogDescription>
+            <DialogTitle className="text-left">Main Config</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col items-stretch justify-between gap-6 mt-4">
-            {topicItems.map((topic) => (
-              <ConfigItem key={topic} client={client} topicItem={topic} />
-            ))}
+            Show HIGH duration config
+            <div className="flex items-center justify-center text-center">
+              <Switch
+                checked={showHighDuration}
+                onCheckedChange={(checked: boolean) =>
+                  setShowHighDuration(checked)
+                }
+              />
+            </div>
           </div>
         </DialogContent>
-      </Dialog> */}
+      </Dialog>
       <div className="mt-42">
         <Logo />
       </div>
@@ -81,7 +94,12 @@ export default function Control() {
         </div>
         <div className="flex flex-col w-full justify-start items-stretch">
           {topicItems.map((topic: mqttTopicItem) => (
-            <ControlItem client={client} topicItem={topic} key={topic} />
+            <ControlItem
+              client={client}
+              topicItem={topic}
+              key={topic}
+              showHighDuration={showHighDuration}
+            />
           ))}
         </div>
       </div>

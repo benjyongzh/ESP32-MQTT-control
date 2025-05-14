@@ -36,8 +36,9 @@ export enum enumSwitchStatus {
 export default function ControlItem(props: {
   client: MqttClient | null;
   topicItem: mqttTopicItem;
+  showHighDuration: boolean;
 }) {
-  const { client, topicItem } = props;
+  const { client, topicItem, showHighDuration } = props;
 
   const onMessageReceived = (topic: string, payload: mqttMessage) => {
     if (topic === topicStatus) {
@@ -174,7 +175,11 @@ export default function ControlItem(props: {
               </section>
               <section className="flex flex-col items-stretch justify-between gap-2 mt-1 pt-2 border-t-2 border-t-primary-foreground">
                 <h3 className="mb-2 font-bold">Config</h3>
-                <ConfigItem client={client} topicItem={topicItem} />
+                <ConfigItem
+                  client={client}
+                  topicItem={topicItem}
+                  showHighDuration={showHighDuration}
+                />
               </section>
             </div>
           </DialogContent>

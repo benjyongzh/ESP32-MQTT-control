@@ -33,10 +33,10 @@ const int message_timestamp_threshold = 5;
 
 // system health check
 // Default valve ON duration (ms)
-const long healthInterval_max_duration = 20;
-const long healthInterval_min_duration = 0.1;
+const float healthInterval_max_duration = 20;
+const float healthInterval_min_duration = 0.1;
 unsigned long lastHealthPublish = 0;
-unsigned long healthInterval = 5;// 5 minutes
+float healthInterval = 5;// 5 minutes
 
 // valve status pin
 // const int valve_status_pin = 32;  //23
@@ -362,17 +362,17 @@ void callback(char* topic, byte* payload, unsigned int length) {
     }
 
     if (doc["message"]["heartbeatInterval"]) {
-      long received_duration = doc["message"]["heartbeatInterval"].as<unsigned long>();
-      if (received_duration > healthInterval_max_duration) {
-        Serial.printf("Received heartbeat interval duration of %luminutes\n", received_duration);
+      float receivedInterval = doc["message"]["heartbeatInterval"].as<float>();
+      if (receivedInterval > healthInterval_max_duration) {
+        Serial.printf("Received heartbeat interval duration of %fminutes\n", receivedInterval);
         healthInterval = healthInterval_max_duration;
-      } else if (received_duration < healthInterval_min_duration) {
-        Serial.printf("Received heartbeat interval duration of %luminutes\n", received_duration);
+      } else if (receivedInterval < healthInterval_min_duration) {
+        Serial.printf("Received heartbeat interval duration of %fminutes\n", receivedInterval);
         healthInterval = healthInterval_min_duration;
       } else {
-        healthInterval = received_duration;
+        healthInterval = receivedInterval;
       }
-      Serial.printf("✅ Heartbeat interval duration for index %i updated to %luminutes\n", topic_id, healthInterval);
+      Serial.printf("✅ Heartbeat interval duration for index %i updated to %fminutes\n", topic_id, healthInterval);
     } else {
       Serial.println("⚠️ JSON missing 'message.heartbeatInterval'");
     }
