@@ -24,7 +24,9 @@ export default function ConfigItem(props: {
   topicItem: mqttTopicItem;
 }) {
   const { client, topicItem } = props;
-  const [configDuration, setConfigDuration] = useState<number>(3000);
+  const [highDuration, setHighDuration] = useState<number>(3000); //milleseconds
+  const [heartbeatIntervalDuration, setHeartbeatIntervalDuration] =
+    useState<number>(5); //minutes
 
   const topicConfig: mqttTopicId = useMemo(
     () => getMqttTopicId(topicItem, enumMqttTopicType.CONFIG),
@@ -35,7 +37,7 @@ export default function ConfigItem(props: {
     if (topic === topicConfig) {
       const message: mqttConfigMessage = payload.message as mqttConfigMessage;
       console.log("onMessageReceived:", message);
-      if (message.duration) setConfigDuration(message.duration);
+      if (message.highDuration) setHighDuration(message.highDuration);
     }
   };
 
@@ -56,7 +58,7 @@ export default function ConfigItem(props: {
 
   const onValueCommit = useCallback(() => {
     const message: mqttMessage = {
-      message: { duration: configDuration },
+      message: { highDuration, heartbeatInterval: heartbeatIntervalDuration },
       timestamp: new Date().toISOString(),
     };
     console.log("message to publish: ", topicConfig, message);
@@ -64,13 +66,13 @@ export default function ConfigItem(props: {
       retain: true,
     });
     toast.success(topicConfig, {
-      description: `Duration updated to ${displayedDuration} seconds`,
+      description: `Duration updated to ${displayedHighDuration} seconds`,
     });
-  }, [client, configDuration, topicConfig]);
+  }, [client, highDuration, topicConfig]);
 
-  const displayedDuration = useMemo(
-    () => (configDuration / 1000).toFixed(1),
-    [configDuration]
+  const displayedHighDuration = useMemo(
+    () => (highDuration / 1000).toFixed(1),
+    [highDuration]
   );
 
   const formattedTopicString: string = useMemo(
@@ -79,22 +81,42 @@ export default function ConfigItem(props: {
   );
 
   return (
-    // <div className="grid grid-cols-[minmax(128px,_1fr)_minmax(_1fr,_10fr)_minmax(40px,_1fr)] gap-1 items-center">
-    <div className="flex flex-col items-start justify-center gap-2">
-      <Label htmlFor={topicItem}>HIGH duration</Label>
-      <div className="flex gap-1 w-full">
-        <Slider
-          onValueChange={([value]) => setConfigDuration(value)}
-          onValueCommit={() => onValueCommit()}
-          value={[configDuration]}
-          defaultValue={[configDuration]}
-          min={SWITCH_MIN_OPEN_DURATION}
-          max={SWITCH_MAX_OPEN_DURATION}
-          step={100}
-          name={topicItem}
-          className="flex-5"
-        />
-        <p className="text-right flex-1">{displayedDuration} s</p>
+    <div className="flex flex-col items-start justify-center gap-3">
+      <div className="flex flex-col items-start justify-center gap-2">
+        <Label htmlFor={topicItem}>HIGH Duration</Label>
+        <div className="flex gap-1 w-full">
+          <Slider
+            onValueChange={([value]) => setHighDuration(value)}
+            onValueCommit={() => onValueCommit()}
+            value={[highDuration]}
+            defaultValue={[highDuration]}
+            min={SWITCH_MIN_OPEN_DURATION}
+            max={SWITCH_MAX_OPEN_DURATION}
+            step={100}
+            name={topicItem}
+            className="flex-5"
+          />
+          <p className="text-right flex-1">{displayedHighDuration} s</p>
+        </div>
+      </div>
+      <div className="flex flex-col items-start justify-center gap-2">
+        <Label htmlFor={topicItem}>Heartbeat Interval</Label>
+        <div className="flex gap-1 w-full">
+          <Slider
+            onValueChange={([value]) => setHeartbeatIntervalDuration(value)}
+            onValueCommit={() => onValueCommit()}
+            value={[heartbeatIntervalDuration]}
+            defaultValue={[heartbeatIntervalDuration]}
+            min={SWITCH_MIN_OPEN_DURATION}
+            max={SWITCH_MAX_OPEN_DURATION}
+            step={0.1}
+            name={topicItem}
+            className="flex-5"
+          />
+          <p className="text-right flex-1">
+            {heartbeatIntervalDuration.toFixed(1)} min
+          </p>
+        </div>
       </div>
     </div>
   );
