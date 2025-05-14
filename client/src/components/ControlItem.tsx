@@ -113,18 +113,20 @@ export default function ControlItem(props: {
     [clientStatus, sendCommand]
   );
 
-  // const formattedDate: string = useMemo(
-  //   () =>
-  //     lastUpdated === "unregistered"
-  //       ? lastUpdated
-  //       : dateFormatter.format(new Date(lastUpdated)),
-  //   [lastUpdated]
-  // );
+  const formattedDateLastActivity: string = useMemo(
+    () =>
+      lastUpdated === "unregistered"
+        ? lastUpdated
+        : dateFormatter.format(new Date(lastUpdated)),
+    [lastUpdated]
+  );
 
-  const formattedDate = useCallback(
-    (date: string) =>
-      date === "unregistered" ? date : dateFormatter.format(new Date(date)),
-    []
+  const formattedDateHealth: string = useMemo(
+    () =>
+      healthLastUpdated === "unregistered"
+        ? healthLastUpdated
+        : dateFormatter.format(new Date(healthLastUpdated)),
+    [healthLastUpdated]
   );
 
   const formattedTopicString: string = useMemo(
@@ -165,13 +167,11 @@ export default function ControlItem(props: {
                   <div className="text-right after:content-[':']">
                     Last Message
                   </div>
-                  <div className="text-left">{formattedDate(lastUpdated)}</div>
+                  <div className="text-left">{formattedDateLastActivity}</div>
                   <div className="text-right after:content-[':']">
                     Controller Health
                   </div>
-                  <div className="text-left">
-                    {formattedDate(healthLastUpdated)}
-                  </div>
+                  <div className="text-left">{formattedDateHealth}</div>
                 </div>
               </section>
               <section className="flex flex-col items-stretch justify-between gap-2 mt-1 pt-2 border-t-2 border-t-primary-foreground">
