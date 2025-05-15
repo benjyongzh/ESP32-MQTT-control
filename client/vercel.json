@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "routes": [
+    {
+      "src": "/[^.]+",
+      "dest": "/",
+      "status": 200
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/(.)*",
+      "destination": "/index.html"
+    }
+  ]
+}
+  
