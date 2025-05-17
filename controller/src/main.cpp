@@ -65,7 +65,7 @@ const int mqtt_connection_status_pin = 25;  //14/25
 bool mqtt_disconnection_blinker_on = false;
 
 // Default valve ON duration (ms)
-const long valve_max_duration = 20000;
+const long valve_max_duration = 60000;
 const long valve_min_duration = 500;
 
 WiFiClientSecure wifiClient;

@@ -1,7 +1,7 @@
 import { topicList } from "./types";
 
 export const SWITCH_MIN_OPEN_DURATION = 500; //miileseconds
-export const SWITCH_MAX_OPEN_DURATION = 20000;
+export const SWITCH_MAX_OPEN_DURATION = 60000;
 
 export const HEARTBEAT_INTERVAL_MIN = 0.1; //minutes
 export const HEARTBEAT_INTERVAL_MAX = 20;
