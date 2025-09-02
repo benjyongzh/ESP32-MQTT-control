@@ -20,14 +20,14 @@ export default function Login() {
         { token },
         { withCredentials: true }
       );
-      navigate("/control");
+      navigate("/menu");
       setIsLoading(false);
-    } catch (err: any) {
+    } catch (err) {
       console.log(err);
-      if (err.response) {
+      if (axios.isAxiosError(err) && err.response) {
         const message: string = `${err.response.status}: ${err.response.statusText}`;
         toast.error(message);
-      } else {
+      } else if (err instanceof Error) {
         toast.error(err.message);
       }
 

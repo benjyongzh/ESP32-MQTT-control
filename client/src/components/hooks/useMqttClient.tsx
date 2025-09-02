@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { MqttClient } from "mqtt";
-import { enumClientStatus } from "@/pages/Control";
+import { enumClientStatus } from "@/types";
 import { mqttMessage } from "@/types";
 
 interface UseMQTTListenerProps {

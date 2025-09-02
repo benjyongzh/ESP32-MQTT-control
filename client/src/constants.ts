@@ -11,3 +11,5 @@ export const CONTROLLER_DEVICE_ID_TO_TOPIC: Record<string, topicList> = {
   "esp32-E6D7": { topic: "water-monsiis", quantity: 2 },
   "esp32-77EE": { topic: "avii-moss", quantity: 1 },
 };
+
+export const AIRCON_MQTT_TOPIC = "mitsubishi-aircon/control";

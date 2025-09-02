@@ -1,5 +1,12 @@
 export type mqttTopicItem = `${string}/${number}`;
 
+export enum enumClientStatus {
+  CONNECTED = "Connected",
+  ERROR = "Error",
+  RECONNECTED = "Reconnected",
+  CLOSED = "Closed",
+}
+
 export const makeMqttTopicItem = (
   topicCategory: string,
   index: number

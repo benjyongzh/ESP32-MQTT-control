@@ -8,7 +8,7 @@ import {
   mqttMessage,
   mqttHealthMessage,
 } from "../types";
-import { enumClientStatus } from "../pages/Control";
+import { enumClientStatus } from "../types";
 import {
   getEnumKeyByEnumValue,
   dateFormatter,
