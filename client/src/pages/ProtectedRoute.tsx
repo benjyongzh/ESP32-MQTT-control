@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom';
 import axios from 'axios';
 
 export default function ProtectedRoute(props: { children:ReactNode }) {
-  const [authenticated, setAuthenticated] = useState<Boolean | null>(null);
+  const [authenticated, setAuthenticated] = useState<boolean | null>(null);
 
   useEffect(() => {
     axios.get(`${import.meta.env.VITE_BACKEND_URL}/auth/check`, { withCredentials: true })

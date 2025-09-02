@@ -15,11 +15,9 @@ import { useMqttClient } from "./hooks/useMqttClient";
 import {
   SWITCH_MIN_OPEN_DURATION,
   SWITCH_MAX_OPEN_DURATION,
-  CONTROLLER_DEVICE_ID_TO_TOPIC,
   HEARTBEAT_INTERVAL_MIN,
   HEARTBEAT_INTERVAL_MAX,
 } from "@/constants";
-import { formatTopicFromTopicString } from "@/utils";
 
 export default function ConfigItem(props: {
   client: MqttClient | null;
@@ -90,11 +88,6 @@ export default function ConfigItem(props: {
   const displayedHighDuration = useMemo(
     () => (highDuration / 1000).toFixed(1),
     [highDuration]
-  );
-
-  const formattedTopicString: string = useMemo(
-    () => formatTopicFromTopicString(topicItem),
-    [CONTROLLER_DEVICE_ID_TO_TOPIC, topicItem]
   );
 
   return (
