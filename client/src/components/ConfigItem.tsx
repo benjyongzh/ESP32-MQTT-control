@@ -37,10 +37,18 @@ export default function ConfigItem(props: {
   const onMessageReceived = (_topic: string, payload: MqttMessageAny) => {
     switch (payload.type) {
       case enumMqttTopicType.CONFIG:
-        if (payload.message.highDuration !== undefined)
-          setHighDuration(payload.message.highDuration);
-        if (payload.message.heartbeatInterval !== undefined)
-          setHeartbeatIntervalDuration(payload.message.heartbeatInterval);
+        switch (payload.message.configType) {
+          case "highDuration":
+            setHighDuration(payload.message.highDuration);
+            break;
+          case "heartbeatInterval":
+            setHeartbeatIntervalDuration(
+              payload.message.heartbeatInterval
+            );
+            break;
+          default:
+            break;
+        }
         break;
       default:
         break;
@@ -53,10 +61,15 @@ export default function ConfigItem(props: {
     onMessage: onMessageReceived,
   });
 
+  const displayedHighDuration = useMemo(
+    () => (highDuration / 1000).toFixed(1),
+    [highDuration]
+  );
+
   const onHighDurationCommit = useCallback(() => {
     const message: MqttConfigMessage = {
       type: enumMqttTopicType.CONFIG,
-      message: { highDuration },
+      message: { configType: "highDuration", highDuration },
       timestamp: new Date().toISOString(),
     };
     console.log("message to publish: ", topicConfig, message);
@@ -71,7 +84,10 @@ export default function ConfigItem(props: {
   const onHeartbeatIntervalCommit = useCallback(() => {
     const message: MqttConfigMessage = {
       type: enumMqttTopicType.CONFIG,
-      message: { heartbeatInterval: heartbeatIntervalDuration },
+      message: {
+        configType: "heartbeatInterval",
+        heartbeatInterval: heartbeatIntervalDuration,
+      },
       timestamp: new Date().toISOString(),
     };
     console.log("message to publish: ", topicConfig, message);
@@ -82,11 +98,6 @@ export default function ConfigItem(props: {
       description: `Heartbeat interval updated to ${heartbeatIntervalDuration} minutes`,
     });
   }, [client, heartbeatIntervalDuration, topicConfig]);
-
-  const displayedHighDuration = useMemo(
-    () => (highDuration / 1000).toFixed(1),
-    [highDuration]
-  );
 
   return (
     <div className="flex flex-col items-start justify-center gap-3">

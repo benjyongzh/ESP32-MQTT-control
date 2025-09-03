@@ -344,37 +344,51 @@ void callback(char* topic, byte* payload, unsigned int length) {
       deactivateSwitch(topic_id);
     }
   } else if (String(topic_type) == String(topic_type_config)) {
-    // Check nested structure
-    if (doc["message"]["highDuration"]) {
-      long received_duration = doc["message"]["highDuration"].as<unsigned long>();
-      if (received_duration > valve_max_duration) {
-        Serial.printf("Received valve duration of %lums\n", received_duration);
-        valves[topic_id].durationMs = valve_max_duration;
-      } else if (received_duration < valve_min_duration) {
-        Serial.printf("Received valve duration of %lums\n", received_duration);
-        valves[topic_id].durationMs = valve_min_duration;
-      } else {
-        valves[topic_id].durationMs = received_duration;
-      }
-      Serial.printf("✅ Valve duration for index %i updated to %lums\n", topic_id, valves[topic_id].durationMs);
-    } else {
-      Serial.println("⚠️ JSON missing 'message.highDuration'");
+    const char* configType = doc["message"]["configType"];
+    if (!configType) {
+      Serial.println("⚠️ JSON missing 'message.configType'");
+      return;
     }
 
-    if (doc["message"]["heartbeatInterval"]) {
-      float receivedInterval = doc["message"]["heartbeatInterval"].as<float>();
-      if (receivedInterval > healthInterval_max_duration) {
-        Serial.printf("Received heartbeat interval duration of %fminutes\n", receivedInterval);
-        healthInterval = healthInterval_max_duration;
-      } else if (receivedInterval < healthInterval_min_duration) {
-        Serial.printf("Received heartbeat interval duration of %fminutes\n", receivedInterval);
-        healthInterval = healthInterval_min_duration;
+    if (String(configType) == "highDuration") {
+      if (doc["message"]["highDuration"]) {
+        long received_duration =
+            doc["message"]["highDuration"].as<unsigned long>();
+        if (received_duration > valve_max_duration) {
+          Serial.printf("Received valve duration of %lums\n", received_duration);
+          valves[topic_id].durationMs = valve_max_duration;
+        } else if (received_duration < valve_min_duration) {
+          Serial.printf("Received valve duration of %lums\n", received_duration);
+          valves[topic_id].durationMs = valve_min_duration;
+        } else {
+          valves[topic_id].durationMs = received_duration;
+        }
+        Serial.printf("✅ Valve duration for index %i updated to %lums\n",
+                      topic_id, valves[topic_id].durationMs);
       } else {
-        healthInterval = receivedInterval;
+        Serial.println("⚠️ JSON missing 'message.highDuration'");
       }
-      Serial.printf("✅ Heartbeat interval duration for index %i updated to %fminutes\n", topic_id, healthInterval);
-    } else {
-      Serial.println("⚠️ JSON missing 'message.heartbeatInterval'");
+    } else if (String(configType) == "heartbeatInterval") {
+      if (doc["message"]["heartbeatInterval"]) {
+        float receivedInterval =
+            doc["message"]["heartbeatInterval"].as<float>();
+        if (receivedInterval > healthInterval_max_duration) {
+          Serial.printf("Received heartbeat interval duration of %fminutes\n",
+                        receivedInterval);
+          healthInterval = healthInterval_max_duration;
+        } else if (receivedInterval < healthInterval_min_duration) {
+          Serial.printf("Received heartbeat interval duration of %fminutes\n",
+                        receivedInterval);
+          healthInterval = healthInterval_min_duration;
+        } else {
+          healthInterval = receivedInterval;
+        }
+        Serial.printf(
+            "✅ Heartbeat interval duration for index %i updated to %fminutes\n",
+            topic_id, healthInterval);
+      } else {
+        Serial.println("⚠️ JSON missing 'message.heartbeatInterval'");
+      }
     }
   }
 }

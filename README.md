@@ -75,15 +75,28 @@ Publish to `irrigation/<id>/control` with payload:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `message.highDuration` | number (ms) | Duration the valve stays open; firmware clamps to safe bounds. |
-| `message.heartbeatInterval` | number (minutes) | Interval between controller health pings. |
+| `message.configType` | string | "highDuration" or "heartbeatInterval" to indicate which setting is being updated. |
+| `message.highDuration` | number (ms) | Present when `configType` is `highDuration`; duration the valve stays open. |
+| `message.heartbeatInterval` | number (minutes) | Present when `configType` is `heartbeatInterval`; interval between controller health pings. |
 
 Publish to `irrigation/<id>/config` with payload:
 
 ```json
 {
   "message": {
-    "highDuration": 3000,
+    "configType": "highDuration",
+    "highDuration": 3000
+  },
+  "timestamp": "2024-01-01T12:00:00.123Z"
+}
+```
+
+or
+
+```json
+{
+  "message": {
+    "configType": "heartbeatInterval",
     "heartbeatInterval": 5
   },
   "timestamp": "2024-01-01T12:00:00.123Z"

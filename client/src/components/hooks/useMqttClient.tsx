@@ -62,7 +62,7 @@ export const useMqttClient = ({
             onMessage(topic, parsed);
             break;
           default:
-            console.warn(`Unhandled MQTT message type: ${parsed.type}`);
+            console.warn("Unhandled MQTT message type");
         }
       }
     };
