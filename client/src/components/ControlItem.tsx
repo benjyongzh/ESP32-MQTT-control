@@ -5,8 +5,8 @@ import {
   mqttTopicItem,
   getMqttTopicId,
   enumMqttTopicType,
-  mqttMessage,
-  mqttHealthMessage,
+  MqttMessageAny,
+  MqttControlMessage,
 } from "../types";
 import { enumClientStatus } from "../types";
 import {
@@ -40,20 +40,30 @@ export default function ControlItem(props: {
 }) {
   const { client, topicItem, showHighDuration } = props;
 
-  const onMessageReceived = (topic: string, payload: mqttMessage) => {
-    if (topic === topicStatus) {
-      if (Object.keys(enumSwitchStatus).includes(payload.message as string)) {
-        const key: string | number = getEnumKeyByEnumValue(
-          enumSwitchStatus,
-          payload.message as string
-        );
-        setStatus(enumSwitchStatus[key as keyof typeof enumSwitchStatus]);
-        setLastUpdated(payload.timestamp);
-      }
-    } else if (topic === topicHealth) {
-      const msg: mqttHealthMessage = JSON.parse(payload.message as string);
-      setIpAddress(msg.ipAddress);
-      setHealthLastUpdated(payload.timestamp);
+  const onMessageReceived = (topic: string, payload: MqttMessageAny) => {
+    switch (payload.type) {
+      case enumMqttTopicType.STATUS:
+        if (topic === topicStatus) {
+          if (Object.keys(enumSwitchStatus).includes(payload.message)) {
+            const key: string | number = getEnumKeyByEnumValue(
+              enumSwitchStatus,
+              payload.message
+            );
+            setStatus(
+              enumSwitchStatus[key as keyof typeof enumSwitchStatus]
+            );
+            setLastUpdated(payload.timestamp);
+          }
+        }
+        break;
+      case enumMqttTopicType.HEALTH:
+        if (topic === topicHealth) {
+          setIpAddress(payload.message.ipAddress);
+          setHealthLastUpdated(payload.timestamp);
+        }
+        break;
+      default:
+        break;
     }
   };
 
@@ -88,7 +98,8 @@ export default function ControlItem(props: {
 
   const sendCommand = useCallback(
     (checked: boolean) => {
-      const message: mqttMessage = {
+      const message: MqttControlMessage = {
+        type: enumMqttTopicType.CONTROL,
         message: checked ? enumSwitchStatus.HIGH : enumSwitchStatus.LOW,
         timestamp: new Date().toISOString(),
       };

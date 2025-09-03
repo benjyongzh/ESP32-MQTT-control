@@ -5,7 +5,11 @@ import { Button } from "@/components/ui/button";
 import { LoaderCircle } from "lucide-react";
 import ControlLayout from "@/components/ControlLayout";
 import { useMqttClient } from "@/components/hooks/useMqttClient";
-import { enumClientStatus, mqttMessage } from "../types";
+import {
+  enumClientStatus,
+  enumMqttTopicType,
+  MqttControlMessage,
+} from "../types";
 import { AIRCON_MQTT_TOPIC } from "../constants";
 
 export default function AirconControl() {
@@ -22,7 +26,8 @@ export default function AirconControl() {
 
   const sendCommand = (cmd: string) => {
     if (!client) return;
-    const message: mqttMessage = {
+    const message: MqttControlMessage = {
+      type: enumMqttTopicType.CONTROL,
       message: cmd,
       timestamp: new Date().toISOString(),
     };
