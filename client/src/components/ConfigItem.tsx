@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { MqttClient } from "mqtt";
 import {
   mqttTopicId,
   mqttTopicItem,
   getMqttTopicId,
   enumMqttTopicType,
-  mqttMessage,
-  mqttConfigMessage,
+  MqttMessageAny,
+  MqttConfigMessage,
 } from "../types";
 import { Label } from "./ui/label";
 import { Slider } from "./ui/slider";
@@ -34,31 +34,28 @@ export default function ConfigItem(props: {
     [topicItem]
   );
 
-  const onMessageReceived = (topic: string, payload: mqttMessage) => {
-    if (topic === topicConfig) {
-      const message: mqttConfigMessage = payload.message as mqttConfigMessage;
-      console.log("onMessageReceived:", message);
-      if (message.highDuration) setHighDuration(message.highDuration);
+  const onMessageReceived = (_topic: string, payload: MqttMessageAny) => {
+    switch (payload.type) {
+      case enumMqttTopicType.CONFIG:
+        if (payload.message.highDuration !== undefined)
+          setHighDuration(payload.message.highDuration);
+        if (payload.message.heartbeatInterval !== undefined)
+          setHeartbeatIntervalDuration(payload.message.heartbeatInterval);
+        break;
+      default:
+        break;
     }
   };
 
-  const { clientStatus } = useMqttClient({
+  useMqttClient({
     mqttClient: client,
     topics: [topicConfig],
     onMessage: onMessageReceived,
   });
 
-  useEffect(() => {
-    client?.on("message", (topic: string, payload: Buffer<ArrayBufferLike>) => {
-      if (topic === topicConfig) {
-        const payloadObject: mqttMessage = JSON.parse(payload.toString());
-        onMessageReceived(topic, payloadObject);
-      }
-    });
-  }, [clientStatus]);
-
   const onHighDurationCommit = useCallback(() => {
-    const message: mqttMessage = {
+    const message: MqttConfigMessage = {
+      type: enumMqttTopicType.CONFIG,
       message: { highDuration },
       timestamp: new Date().toISOString(),
     };
@@ -69,10 +66,11 @@ export default function ConfigItem(props: {
     toast.success(topicConfig, {
       description: `HIGH duration updated to ${displayedHighDuration} seconds`,
     });
-  }, [client, highDuration, topicConfig]);
+  }, [client, highDuration, topicConfig, displayedHighDuration]);
 
   const onHeartbeatIntervalCommit = useCallback(() => {
-    const message: mqttMessage = {
+    const message: MqttConfigMessage = {
+      type: enumMqttTopicType.CONFIG,
       message: { heartbeatInterval: heartbeatIntervalDuration },
       timestamp: new Date().toISOString(),
     };

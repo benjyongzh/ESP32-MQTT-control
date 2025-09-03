@@ -31,10 +31,33 @@ export const getMqttTopicId = (
 export type mqttTopicId = `${mqttTopicItem}/${enumMqttTopicType}`;
 // const id: mqttTopicId = 'irrigation/1/control';
 
-export type mqttMessage = {
-  message: string | mqttConfigMessage | mqttHealthMessage;
+export interface MqttMessage<T> {
+  type: enumMqttTopicType;
+  message: T;
   timestamp: string;
-};
+}
+
+export interface MqttStatusMessage extends MqttMessage<string> {
+  type: enumMqttTopicType.STATUS;
+}
+
+export interface MqttConfigMessage extends MqttMessage<mqttConfigMessage> {
+  type: enumMqttTopicType.CONFIG;
+}
+
+export interface MqttHealthMessage extends MqttMessage<mqttHealthMessage> {
+  type: enumMqttTopicType.HEALTH;
+}
+
+export interface MqttControlMessage extends MqttMessage<string> {
+  type: enumMqttTopicType.CONTROL;
+}
+
+export type MqttMessageAny =
+  | MqttStatusMessage
+  | MqttConfigMessage
+  | MqttHealthMessage
+  | MqttControlMessage;
 
 export type mqttConfigMessage = {
   highDuration?: number;
