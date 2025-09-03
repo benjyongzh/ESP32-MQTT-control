@@ -16,7 +16,10 @@ const int mqtt_port = MQTT_PORT;
 const char* mqtt_user = MQTT_USERNAME;
 const char* mqtt_pass = MQTT_PASSWORD;
 
-const char* mqtt_topic = "mitsubishi-aircon/control";
+char deviceId[32];
+const int componentIndex = 1;
+const char* topic_type_control = "control";
+char mqtt_topic[64];
 
 WiFiClientSecure wifiClient;
 PubSubClient client(wifiClient);
@@ -33,7 +36,8 @@ void connectWiFi() {
 
 void connectMQTT() {
   while (!client.connected()) {
-    if (client.connect("esp32-aircon", mqtt_user, mqtt_pass)) {
+    if (client.connect(deviceId, mqtt_user, mqtt_pass)) {
+      snprintf(mqtt_topic, sizeof(mqtt_topic), "%s/%d/%s", deviceId, componentIndex, topic_type_control);
       client.subscribe(mqtt_topic);
     } else {
       delay(1000);
@@ -67,6 +71,8 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
 void setup() {
   Serial.begin(115200);
+  uint64_t chipId = ESP.getEfuseMac();
+  snprintf(deviceId, sizeof(deviceId), "esp32-aircon-%04X", (uint16_t)(chipId & 0xFFFF));
   wifiClient.setInsecure();
   connectWiFi();
   client.setServer(mqtt_server, mqtt_port);
