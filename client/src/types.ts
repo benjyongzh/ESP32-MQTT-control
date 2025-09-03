@@ -59,12 +59,19 @@ export type MqttMessageAny =
   | MqttHealthMessage
   | MqttControlMessage;
 
-export type mqttConfigMessage = {
-  highDuration?: number;
-  heartbeatInterval?: number;
-  // add other config properties here in the future
-  // e.g. pressure: number, enabled: boolean, etc.
-};
+export interface HighDurationConfig {
+  configType: "highDuration";
+  highDuration: number;
+}
+
+export interface HeartbeatIntervalConfig {
+  configType: "heartbeatInterval";
+  heartbeatInterval: number;
+}
+
+export type mqttConfigMessage =
+  | HighDurationConfig
+  | HeartbeatIntervalConfig;
 
 export type mqttHealthMessage = {
   ipAddress: string;
