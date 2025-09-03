@@ -8,11 +8,16 @@ const app = express();
 // const PORT = 4000;
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24; // 1 day
 
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  process.env.FRONTEND_URL_DEPLOY,
+].filter(Boolean);
+
 app.use(express.json());
 app.use(cookieParser());
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL, // Vite frontend
+    origin: allowedOrigins, // Vite frontend and deploy branch
     credentials: true,
   })
 );
