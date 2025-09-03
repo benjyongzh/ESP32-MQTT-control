@@ -1,4 +1,4 @@
-import { topicList } from "./types";
+import { topicList, enumMqttTopicType } from "./types";
 
 export const SWITCH_MIN_OPEN_DURATION = 500; //miileseconds
 export const SWITCH_MAX_OPEN_DURATION = 60000;
@@ -12,4 +12,6 @@ export const CONTROLLER_DEVICE_ID_TO_TOPIC: Record<string, topicList> = {
   "esp32-77EE": { topic: "avii-moss", quantity: 1 },
 };
 
-export const AIRCON_MQTT_TOPIC = "mitsubishi-aircon/control";
+export const AIRCON_DEVICE_ID = "mitsubishi-aircon";
+export const AIRCON_COMPONENT_INDEX = 1;
+export const AIRCON_MQTT_TOPIC = `${AIRCON_DEVICE_ID}/${AIRCON_COMPONENT_INDEX}/${enumMqttTopicType.CONTROL}`;
