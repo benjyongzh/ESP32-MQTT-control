@@ -32,7 +32,6 @@ const char* topic_type_health = "controllerhealth";
 const int message_timestamp_threshold = 5;
 
 // system health check
-// Default valve ON duration (ms)
 const float healthInterval_max_duration = 20;
 const float healthInterval_min_duration = 0.1;
 unsigned long lastHealthPublish = 0;
@@ -42,19 +41,40 @@ float healthInterval = 5;// 5 minutes
 // const int valve_status_pin = 32;  //23
 #define MAX_VALVES 4
 
+const int weightSensorPin = 34;
+const unsigned long DEFAULT_WEIGHT_READ_INTERVAL_MS = 500;
+const unsigned long MIN_WEIGHT_READ_INTERVAL_MS = 100;
+const unsigned long MAX_WEIGHT_READ_INTERVAL_MS = 10000;
+const float DEFAULT_TARGET_WEIGHT_INCREASE = 100.0f;
+const float MIN_TARGET_WEIGHT_INCREASE = 0.0f;
+const float DEFAULT_TOLERANCE_WEIGHT = 10.0f;
+const float MIN_TOLERANCE_WEIGHT = 0.0f;
+const unsigned long DEFAULT_TOLERANCE_DURATION_MS = 5000;
+const unsigned long MIN_TOLERANCE_DURATION_MS = 1000;
+const unsigned long MAX_TOLERANCE_DURATION_MS = 600000;
+
 struct ValveConfig {
   uint8_t pin;
-  unsigned long durationMs;
   bool active;
   unsigned long startTime;
+  unsigned long lastWeightReadTime;
+  float startWeight;
+  float lastWeight;
+  float targetWeightIncrease;
+  float toleranceWeight;
+  unsigned long toleranceDurationMs;
+  unsigned long weightReadIntervalMs;
+  bool toleranceSatisfied;
 };
 
 ValveConfig valves[MAX_VALVES] = {
-  {32, 3000, false, 0}, // Valve 0
-  {15, 3000, false, 0}, // Valve 1
-  {17, 3000, false, 0}, // Valve 2
-  {18, 3000, false, 0}  // Valve 3
+  {32, false, 0, 0, 0.0f, 0.0f, DEFAULT_TARGET_WEIGHT_INCREASE, DEFAULT_TOLERANCE_WEIGHT, DEFAULT_TOLERANCE_DURATION_MS, DEFAULT_WEIGHT_READ_INTERVAL_MS, false},
+  {15, false, 0, 0, 0.0f, 0.0f, DEFAULT_TARGET_WEIGHT_INCREASE, DEFAULT_TOLERANCE_WEIGHT, DEFAULT_TOLERANCE_DURATION_MS, DEFAULT_WEIGHT_READ_INTERVAL_MS, false},
+  {17, false, 0, 0, 0.0f, 0.0f, DEFAULT_TARGET_WEIGHT_INCREASE, DEFAULT_TOLERANCE_WEIGHT, DEFAULT_TOLERANCE_DURATION_MS, DEFAULT_WEIGHT_READ_INTERVAL_MS, false},
+  {18, false, 0, 0, 0.0f, 0.0f, DEFAULT_TARGET_WEIGHT_INCREASE, DEFAULT_TOLERANCE_WEIGHT, DEFAULT_TOLERANCE_DURATION_MS, DEFAULT_WEIGHT_READ_INTERVAL_MS, false}
 };
+
+float lastWeightReading = 0.0f;
 
 // wifi connection status pin
 const int wifi_connection_status_pin = 27;  //15/27
@@ -63,10 +83,6 @@ bool wifi_disconnection_blinker_on = false;
 // mqtt connection status pin
 const int mqtt_connection_status_pin = 25;  //14/25
 bool mqtt_disconnection_blinker_on = false;
-
-// Default valve ON duration (ms)
-const long valve_max_duration = 60000;
-const long valve_min_duration = 500;
 
 WiFiClientSecure wifiClient;
 PubSubClient client(wifiClient);
@@ -196,15 +212,13 @@ String getCurrentTimestamp() {
   return String(buffer);
 }
 
-void publishCommand(const char* topic, const char* cmd) {
-  JsonDocument doc;
-  doc["message"] = cmd;
+bool publishCommand(const char* topic, JsonDocument& doc, bool retain = true) {
   doc["timestamp"] = getCurrentTimestamp();
 
   char payload[256];
   serializeJson(doc, payload);
 
-  bool published = client.publish(topic, payload, true);
+  bool published = client.publish(topic, payload, retain);
   if (published) {
     Serial.print("Message PUBLISHED [");
     Serial.print(topic);
@@ -215,24 +229,94 @@ void publishCommand(const char* topic, const char* cmd) {
     Serial.print(topic);
     Serial.println("]");
   }
+  return published;
+}
+
+void publishCommand(const char* topic, const char* cmd, bool retain = true) {
+  JsonDocument doc;
+  doc["message"] = cmd;
+  publishCommand(topic, doc, retain);
+}
+
+int topicIdToIndex(int topicId) {
+  int index = topicId - 1;
+  if (index < 0 || index >= MAX_VALVES) {
+    Serial.printf("Invalid valve id %d in topic\n", topicId);
+    return -1;
+  }
+  return index;
+}
+
+float readWeightSensor() {
+  int rawValue = analogRead(weightSensorPin);
+  float weight = static_cast<float>(rawValue);
+  lastWeightReading = weight;
+  return weight;
+}
+
+void publishValveState(int valveIdInTopic, const char* state, float weight,
+                       float delta, bool retain = true,
+                       const char* reason = nullptr) {
+  char topic_status[64];
+  snprintf(topic_status, sizeof(topic_status), "%s/%i/%s", deviceId,
+           valveIdInTopic, topic_type_status);
+
+  JsonDocument doc;
+  JsonObject message = doc["message"].to<JsonObject>();
+  message["state"] = state;
+  message["weight"] = weight;
+  message["weightDelta"] = delta;
+  if (reason) {
+    message["reason"] = reason;
+  }
+  publishCommand(topic_status, doc, retain);
 }
 
 void activateSwitch(int valveIdInTopic) {
-  digitalWrite(valves[valveIdInTopic-1].pin, HIGH);
-  // Static buffer, max length: clientId + '/' + pin (3 chars max) + '/' + messageType + '\0'
-  char topic_status[64];
-  snprintf(topic_status, sizeof(topic_status), "%s/%i/%s", deviceId, valveIdInTopic, topic_type_status);
-  publishCommand(topic_status, "HIGH");
-  valves[valveIdInTopic].active = true;
-  valves[valveIdInTopic].startTime = millis();
+  int index = topicIdToIndex(valveIdInTopic);
+  if (index < 0) {
+    return;
+  }
+
+  ValveConfig &valve = valves[index];
+  if (valve.active) {
+    Serial.printf("Valve %d already active\n", valveIdInTopic);
+    return;
+  }
+
+  digitalWrite(valve.pin, HIGH);
+  valve.active = true;
+  valve.startTime = millis();
+  valve.toleranceSatisfied = valve.toleranceWeight <= MIN_TOLERANCE_WEIGHT;
+  valve.startWeight = readWeightSensor();
+  valve.lastWeight = valve.startWeight;
+  valve.lastWeightReadTime = millis();
+
+  publishValveState(valveIdInTopic, "HIGH", valve.startWeight, 0.0f, true);
 }
 
-void deactivateSwitch(int valveIdInTopic) {
-  digitalWrite(valves[valveIdInTopic-1].pin, LOW);
-  char topic_status[64];
-  snprintf(topic_status, sizeof(topic_status), "%s/%i/%s", deviceId, valveIdInTopic, topic_type_status);
-  publishCommand(topic_status, "LOW");
-  valves[valveIdInTopic].active = false;
+void deactivateSwitch(int valveIdInTopic, const char* reason = nullptr) {
+  int index = topicIdToIndex(valveIdInTopic);
+  if (index < 0) {
+    return;
+  }
+
+  ValveConfig &valve = valves[index];
+  if (!valve.active) {
+    Serial.printf("Valve %d already inactive\n", valveIdInTopic);
+    return;
+  }
+
+  digitalWrite(valve.pin, LOW);
+  valve.active = false;
+  float delta = valve.lastWeight - valve.startWeight;
+  publishValveState(valveIdInTopic, "LOW", valve.lastWeight, delta, true,
+                    reason);
+  valve.startWeight = 0.0f;
+  valve.lastWeight = 0.0f;
+  valve.startTime = 0;
+  valve.lastWeightReadTime = 0;
+  valve.toleranceSatisfied = false;
 }
 
 time_t timegm_fallback(struct tm *tm) {
@@ -341,32 +425,76 @@ void callback(char* topic, byte* payload, unsigned int length) {
     if (String(messageContent) == "HIGH") {
       activateSwitch(topic_id);
     } else if (String(messageContent) == "LOW") {
-      deactivateSwitch(topic_id);
+      deactivateSwitch(topic_id, "manual");
     }
   } else if (String(topic_type) == String(topic_type_config)) {
+    int index = topicIdToIndex(topic_id);
+    if (index < 0) {
+      return;
+    }
+
+    ValveConfig &valve = valves[index];
     const char* configType = doc["message"]["configType"];
     if (!configType) {
       Serial.println("⚠️ JSON missing 'message.configType'");
       return;
     }
 
-    if (String(configType) == "highDuration") {
-      if (doc["message"]["highDuration"]) {
-        long received_duration =
-            doc["message"]["highDuration"].as<unsigned long>();
-        if (received_duration > valve_max_duration) {
-          Serial.printf("Received valve duration of %lums\n", received_duration);
-          valves[topic_id].durationMs = valve_max_duration;
-        } else if (received_duration < valve_min_duration) {
-          Serial.printf("Received valve duration of %lums\n", received_duration);
-          valves[topic_id].durationMs = valve_min_duration;
+    if (String(configType) == "weightControl") {
+      if (doc["message"].containsKey("targetWeightIncrease")) {
+        float receivedTarget =
+            doc["message"]["targetWeightIncrease"].as<float>();
+        if (receivedTarget >= MIN_TARGET_WEIGHT_INCREASE) {
+          valve.targetWeightIncrease = receivedTarget;
+          Serial.printf(
+              "✅ Valve %d target weight increase updated to %f\n",
+              topic_id, valve.targetWeightIncrease);
         } else {
-          valves[topic_id].durationMs = received_duration;
+          Serial.println(
+              "⚠️ targetWeightIncrease below minimum, ignoring update");
         }
-        Serial.printf("✅ Valve duration for index %i updated to %lums\n",
-                      topic_id, valves[topic_id].durationMs);
-      } else {
-        Serial.println("⚠️ JSON missing 'message.highDuration'");
+      }
+
+      if (doc["message"].containsKey("toleranceWeight")) {
+        float receivedTolerance =
+            doc["message"]["toleranceWeight"].as<float>();
+        if (receivedTolerance >= MIN_TOLERANCE_WEIGHT) {
+          valve.toleranceWeight = receivedTolerance;
+          Serial.printf(
+              "✅ Valve %d tolerance weight updated to %f\n",
+              topic_id, valve.toleranceWeight);
+        } else {
+          Serial.println(
+              "⚠️ toleranceWeight below minimum, ignoring update");
+        }
+      }
+
+      if (doc["message"].containsKey("toleranceDurationMs")) {
+        unsigned long receivedDuration =
+            doc["message"]["toleranceDurationMs"].as<unsigned long>();
+        if (receivedDuration < MIN_TOLERANCE_DURATION_MS) {
+          receivedDuration = MIN_TOLERANCE_DURATION_MS;
+        } else if (receivedDuration > MAX_TOLERANCE_DURATION_MS) {
+          receivedDuration = MAX_TOLERANCE_DURATION_MS;
+        }
+        valve.toleranceDurationMs = receivedDuration;
+        Serial.printf(
+            "✅ Valve %d tolerance duration updated to %lums\n",
+            topic_id, valve.toleranceDurationMs);
+      }
+
+      if (doc["message"].containsKey("weightReadIntervalMs")) {
+        unsigned long receivedInterval =
+            doc["message"]["weightReadIntervalMs"].as<unsigned long>();
+        if (receivedInterval < MIN_WEIGHT_READ_INTERVAL_MS) {
+          receivedInterval = MIN_WEIGHT_READ_INTERVAL_MS;
+        } else if (receivedInterval > MAX_WEIGHT_READ_INTERVAL_MS) {
+          receivedInterval = MAX_WEIGHT_READ_INTERVAL_MS;
+        }
+        valve.weightReadIntervalMs = receivedInterval;
+        Serial.printf(
+            "✅ Valve %d weight read interval updated to %lums\n",
+            topic_id, valve.weightReadIntervalMs);
       }
     } else if (String(configType) == "heartbeatInterval") {
       if (doc["message"]["heartbeatInterval"]) {
@@ -398,16 +526,16 @@ void publishHealthStatus() {
   char ipStr[16];
   snprintf(ipStr, sizeof(ipStr), "%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
 
-  JsonDocument doc;
-  doc["ipAddress"] = ipStr;
-
-  char payload[128];
-  serializeJson(doc, payload);
-
   for (int i=0; i < MAX_VALVES; i++ ) {
     char topic[64];
     snprintf(topic, sizeof(topic), "%s/%i/%s", deviceId, i+1, topic_type_health);
-    publishCommand(topic, payload);
+
+    JsonDocument doc;
+    JsonObject message = doc["message"].to<JsonObject>();
+    message["ipAddress"] = ipStr;
+    message["active"] = digitalRead(valves[i].pin) == HIGH;
+    message["weight"] = lastWeightReading;
+    publishCommand(topic, doc, true);
   }
 }
 
@@ -415,6 +543,7 @@ void setup() {
   Serial.begin(115200);
   pinMode(wifi_connection_status_pin, OUTPUT);
   pinMode(mqtt_connection_status_pin, OUTPUT);
+  pinMode(weightSensorPin, INPUT);
   for (int i=0; i < MAX_VALVES; i++ ) {
     pinMode(valves[i].pin, OUTPUT);
   }
@@ -440,12 +569,45 @@ void loop() {
   }
 
   for (int i=0; i < MAX_VALVES; i++ ) {
-    if (valves[i].active == true) {
-      unsigned long currentTime = millis();
-      if (currentTime - valves[i].startTime >= valves[i].durationMs) {
-        // Time's up, turn off the valve
-        deactivateSwitch(i);
-        Serial.printf("Valve %i auto-turned off after set duration\n", i);
+    ValveConfig &valve = valves[i];
+    if (!valve.active) {
+      continue;
+    }
+
+    unsigned long now = millis();
+
+    if (now - valve.lastWeightReadTime >= valve.weightReadIntervalMs) {
+      float currentWeight = readWeightSensor();
+      valve.lastWeight = currentWeight;
+      valve.lastWeightReadTime = now;
+
+      float delta = valve.lastWeight - valve.startWeight;
+      int pinState = digitalRead(valve.pin);
+      publishValveState(i + 1, pinState == HIGH ? "HIGH" : "LOW",
+                        valve.lastWeight, delta, false);
+
+      if (delta >= valve.targetWeightIncrease) {
+        Serial.printf("Valve %d target weight increase reached, closing valve\n",
+                      i + 1);
+        deactivateSwitch(i + 1, "target_reached");
+        continue;
+      }
+
+      if (!valve.toleranceSatisfied && delta >= valve.toleranceWeight) {
+        valve.toleranceSatisfied = true;
+      }
+    }
+
+    if (!valve.toleranceSatisfied &&
+        now - valve.startTime >= valve.toleranceDurationMs) {
+      float delta = valve.lastWeight - valve.startWeight;
+      if (delta < valve.toleranceWeight) {
+        Serial.printf("Valve %d tolerance condition not met, closing valve\n",
+                      i + 1);
+        deactivateSwitch(i + 1, "tolerance_timeout");
+        continue;
+      } else {
+        valve.toleranceSatisfied = true;
       }
     }
  }

@@ -21,7 +21,7 @@ import { Switch } from "@/components/ui/switch";
 export default function IrrigationControl() {
   const [client, setClient] = useState<MqttClient | null>(null);
   const { clientStatus } = useMqttClient({ mqttClient: client });
-  const [showHighDuration, setShowHighDuration] = useState<boolean>(false); //minutes
+  const [showWeightConfig, setShowWeightConfig] = useState<boolean>(true);
 
   useEffect(() => {
     const mqttClient = mqtt.connect(import.meta.env.VITE_MQTT_CLUSTER_URL, {
@@ -50,12 +50,12 @@ export default function IrrigationControl() {
         </DialogHeader>
         <div className="flex flex-col items-stretch justify-between gap-6 mt-4">
           <div className="flex justify-between items-center">
-            <p>Show HIGH duration config</p>
+            <p>Show weight control config</p>
             <div className="flex items-center justify-center text-center">
               <Switch
-                checked={showHighDuration}
+                checked={showWeightConfig}
                 onCheckedChange={(checked: boolean) =>
-                  setShowHighDuration(checked)
+                  setShowWeightConfig(checked)
                 }
               />
             </div>
@@ -97,7 +97,7 @@ export default function IrrigationControl() {
               client={client}
               topicItem={topic}
               key={topic}
-              showHighDuration={showHighDuration}
+              showWeightConfig={showWeightConfig}
             />
           ))}
         </div>

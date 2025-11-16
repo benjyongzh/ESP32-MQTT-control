@@ -37,12 +37,27 @@ export interface MqttMessage<T> {
   timestamp: string;
 }
 
-export interface MqttStatusMessage extends MqttMessage<string> {
+export type ValveState = "LOW" | "HIGH";
+
+export interface ValveStatusPayload {
+  state: ValveState;
+  weight: number;
+  weightDelta: number;
+  reason?: string;
+}
+
+export interface MqttStatusMessage extends MqttMessage<ValveStatusPayload> {
   type: enumMqttTopicType.STATUS;
 }
 
 export interface MqttConfigMessage extends MqttMessage<mqttConfigMessage> {
   type: enumMqttTopicType.CONFIG;
+}
+
+export interface ValveHealthPayload {
+  ipAddress: string;
+  active: boolean;
+  weight: number;
 }
 
 export interface MqttHealthMessage extends MqttMessage<mqttHealthMessage> {
@@ -59,23 +74,24 @@ export type MqttMessageAny =
   | MqttHealthMessage
   | MqttControlMessage;
 
-export interface HighDurationConfig {
-  configType: "highDuration";
-  highDuration: number;
-}
-
 export interface HeartbeatIntervalConfig {
   configType: "heartbeatInterval";
   heartbeatInterval: number;
 }
 
-export type mqttConfigMessage =
-  | HighDurationConfig
-  | HeartbeatIntervalConfig;
+export interface WeightControlConfig {
+  configType: "weightControl";
+  targetWeightIncrease?: number;
+  toleranceWeight?: number;
+  toleranceDurationMs?: number;
+  weightReadIntervalMs?: number;
+}
 
-export type mqttHealthMessage = {
-  ipAddress: string;
-};
+export type mqttConfigMessage =
+  | HeartbeatIntervalConfig
+  | WeightControlConfig;
+
+export type mqttHealthMessage = ValveHealthPayload;
 
 export type topicList = {
   topic: string;

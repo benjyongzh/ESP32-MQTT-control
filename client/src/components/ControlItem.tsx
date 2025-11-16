@@ -7,13 +7,11 @@ import {
   enumMqttTopicType,
   MqttMessageAny,
   MqttControlMessage,
+  ValveStatusPayload,
+  ValveHealthPayload,
 } from "../types";
 import { enumClientStatus } from "../types";
-import {
-  getEnumKeyByEnumValue,
-  dateFormatter,
-  formatTopicFromTopicString,
-} from "../utils";
+import { dateFormatter, formatTopicFromTopicString } from "../utils";
 import { Switch } from "./ui/switch";
 import SwitchStatusText from "./SwitchStatusText";
 import { useMqttClient } from "./hooks/useMqttClient";
@@ -36,29 +34,51 @@ export enum enumSwitchStatus {
 export default function ControlItem(props: {
   client: MqttClient | null;
   topicItem: mqttTopicItem;
-  showHighDuration: boolean;
+  showWeightConfig: boolean;
 }) {
-  const { client, topicItem, showHighDuration } = props;
+  const { client, topicItem, showWeightConfig } = props;
 
   const onMessageReceived = (topic: string, payload: MqttMessageAny) => {
     switch (payload.type) {
       case enumMqttTopicType.STATUS:
         if (topic === topicStatus) {
-          if (Object.keys(enumSwitchStatus).includes(payload.message)) {
-            const key: string | number = getEnumKeyByEnumValue(
-              enumSwitchStatus,
-              payload.message
-            );
-            setStatus(
-              enumSwitchStatus[key as keyof typeof enumSwitchStatus]
-            );
-            setLastUpdated(payload.timestamp);
+          const message = payload.message as ValveStatusPayload;
+          if (typeof message.weight === "number") {
+            setCurrentWeight(message.weight);
+          } else {
+            setCurrentWeight(null);
+          }
+          if (typeof message.weightDelta === "number") {
+            setWeightDelta(message.weightDelta);
+          } else {
+            setWeightDelta(null);
+          }
+          setLastWeightUpdate(payload.timestamp);
+          setLastUpdated(payload.timestamp);
+
+          if (message.reason !== undefined) {
+            setLastReason(message.reason ? message.reason : null);
+          }
+
+          if (message.state === "HIGH") {
+            setStatus(enumSwitchStatus.HIGH);
+          } else if (message.state === "LOW") {
+            setStatus(enumSwitchStatus.LOW);
+          } else {
+            setStatus(enumSwitchStatus.UNKNOWN);
           }
         }
         break;
       case enumMqttTopicType.HEALTH:
         if (topic === topicHealth) {
-          setIpAddress(payload.message.ipAddress);
+          const message = payload.message as ValveHealthPayload;
+          setIpAddress(message.ipAddress);
+          setHealthActive(Boolean(message.active));
+          if (typeof message.weight === "number") {
+            setHealthWeight(message.weight);
+          } else {
+            setHealthWeight(null);
+          }
           setHealthLastUpdated(payload.timestamp);
         }
         break;
@@ -89,6 +109,12 @@ export default function ControlItem(props: {
   const [lastUpdated, setLastUpdated] = useState<string>("Unregistered");
   const [ipAddress, setIpAddress] = useState<string>("Unknown");
   const [healthLastUpdated, setHealthLastUpdated] = useState<string>("Unknown");
+  const [currentWeight, setCurrentWeight] = useState<number | null>(null);
+  const [weightDelta, setWeightDelta] = useState<number | null>(null);
+  const [lastWeightUpdate, setLastWeightUpdate] = useState<string>("Unknown");
+  const [lastReason, setLastReason] = useState<string | null>(null);
+  const [healthActive, setHealthActive] = useState<boolean>(false);
+  const [healthWeight, setHealthWeight] = useState<number | null>(null);
 
   useEffect(() => {
     if (clientStatus === enumClientStatus.ERROR) {
@@ -139,6 +165,31 @@ export default function ControlItem(props: {
     [healthLastUpdated]
   );
 
+  const formattedCurrentWeight: string = useMemo(
+    () =>
+      currentWeight === null ? "Unknown" : currentWeight.toFixed(2),
+    [currentWeight]
+  );
+
+  const formattedWeightDelta: string = useMemo(
+    () => (weightDelta === null ? "Unknown" : weightDelta.toFixed(2)),
+    [weightDelta]
+  );
+
+  const formattedLastWeightUpdate: string = useMemo(
+    () =>
+      lastWeightUpdate === "Unknown"
+        ? lastWeightUpdate
+        : dateFormatter.format(new Date(lastWeightUpdate)),
+    [lastWeightUpdate]
+  );
+
+  const formattedHealthWeight: string = useMemo(
+    () =>
+      healthWeight === null ? "Unknown" : healthWeight.toFixed(2),
+    [healthWeight]
+  );
+
   const formattedTopicString: string = useMemo(
     () => formatTopicFromTopicString(topicItem),
     [CONTROLLER_DEVICE_ID_TO_TOPIC, topicItem]
@@ -182,6 +233,30 @@ export default function ControlItem(props: {
                     Last heartbeat
                   </div>
                   <div className="text-left">{formattedDateHealth}</div>
+                  <div className="text-right after:content-[':']">
+                    Valve active
+                  </div>
+                  <div className="text-left">{healthActive ? "Yes" : "No"}</div>
+                  <div className="text-right after:content-[':']">
+                    Current weight
+                  </div>
+                  <div className="text-left">{formattedCurrentWeight}</div>
+                  <div className="text-right after:content-[':']">
+                    Weight Δ
+                  </div>
+                  <div className="text-left">{formattedWeightDelta}</div>
+                  <div className="text-right after:content-[':']">
+                    Last weight update
+                  </div>
+                  <div className="text-left">{formattedLastWeightUpdate}</div>
+                  <div className="text-right after:content-[':']">
+                    Last close reason
+                  </div>
+                  <div className="text-left">{lastReason ?? "—"}</div>
+                  <div className="text-right after:content-[':']">
+                    Heartbeat weight
+                  </div>
+                  <div className="text-left">{formattedHealthWeight}</div>
                 </div>
               </section>
               <section className="flex flex-col items-stretch justify-between gap-2 mt-1 pt-2 border-t-2 border-t-primary-foreground">
@@ -189,7 +264,7 @@ export default function ControlItem(props: {
                 <ConfigItem
                   client={client}
                   topicItem={topicItem}
-                  showHighDuration={showHighDuration}
+                  showWeightConfig={showWeightConfig}
                 />
               </section>
             </div>
