@@ -3,9 +3,10 @@ import mqtt, { MqttClient } from "mqtt";
 import ControlItem from "../components/ControlItem";
 import Logo from "@/components/Logo";
 import { CONTROLLER_DEVICE_ID_TO_TOPIC } from "../constants";
-import { mqttTopicItem } from "../types";
+import { mqttTopicItem, enumClientStatus } from "../types";
 import { getArrayOfTopicItems } from "../utils";
 import { LoaderCircle, Bolt } from "lucide-react";
+import ControlLayout from "@/components/ControlLayout";
 import { useMqttClient } from "@/components/hooks/useMqttClient";
 import {
   Dialog,
@@ -17,17 +18,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 
-export enum enumClientStatus {
-  CONNECTED = "Connected",
-  ERROR = "Error",
-  RECONNECTED = "Reconnected",
-  CLOSED = "Closed",
-}
-
-export default function Control() {
+export default function IrrigationControl() {
   const [client, setClient] = useState<MqttClient | null>(null);
   const { clientStatus } = useMqttClient({ mqttClient: client });
-  const [showHighDuration, setShowHighDuration] = useState<boolean>(false); //minutes
+  const [showWeightConfig, setShowWeightConfig] = useState<boolean>(true);
 
   useEffect(() => {
     const mqttClient = mqtt.connect(import.meta.env.VITE_MQTT_CLUSTER_URL, {
@@ -43,33 +37,36 @@ export default function Control() {
     [CONTROLLER_DEVICE_ID_TO_TOPIC]
   );
 
-  return (
-    <div className="base relative">
-      <Dialog>
-        <DialogTrigger asChild>
-          <Button variant={"ghost"} className="absolute right-3">
-            <Bolt />
-          </Button>
-        </DialogTrigger>
-        <DialogContent className="max-w-xs md:max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="text-left">Main Config</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col items-stretch justify-between gap-6 mt-4">
-            <div className="flex justify-between items-center">
-              <p>Show HIGH duration config</p>
-              <div className="flex items-center justify-center text-center">
-                <Switch
-                  checked={showHighDuration}
-                  onCheckedChange={(checked: boolean) =>
-                    setShowHighDuration(checked)
-                  }
-                />
-              </div>
+  const configDialog = (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant={"ghost"}>
+          <Bolt />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-xs md:max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="text-left">Main Config</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col items-stretch justify-between gap-6 mt-4">
+          <div className="flex justify-between items-center">
+            <p>Show weight control config</p>
+            <div className="flex items-center justify-center text-center">
+              <Switch
+                checked={showWeightConfig}
+                onCheckedChange={(checked: boolean) =>
+                  setShowWeightConfig(checked)
+                }
+              />
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+
+  return (
+    <ControlLayout rightSlot={configDialog}>
       <div className="mt-42">
         <Logo />
       </div>
@@ -100,11 +97,11 @@ export default function Control() {
               client={client}
               topicItem={topic}
               key={topic}
-              showHighDuration={showHighDuration}
+              showWeightConfig={showWeightConfig}
             />
           ))}
         </div>
       </div>
-    </div>
+    </ControlLayout>
   );
 }

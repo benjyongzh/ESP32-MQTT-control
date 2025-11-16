@@ -2,6 +2,7 @@ const express = require("express");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
 require("dotenv").config();
+const { startMqttLogger } = require("../mqttLogger");
 
 const app = express();
 // const PORT = 4000;
@@ -62,6 +63,9 @@ app.post("/auth/logout", (req, res) => {
 app.get("/", (req, res) => {
   res.send("ESP32 backend auth server reached");
 });
+
+// Start MQTT logging service
+startMqttLogger();
 
 // app.listen(PORT, () => {
 //   console.log(`✅ Auth server running at ${PORT}`);

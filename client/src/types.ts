@@ -1,5 +1,12 @@
 export type mqttTopicItem = `${string}/${number}`;
 
+export enum enumClientStatus {
+  CONNECTED = "Connected",
+  ERROR = "Error",
+  RECONNECTED = "Reconnected",
+  CLOSED = "Closed",
+}
+
 export const makeMqttTopicItem = (
   topicCategory: string,
   index: number
@@ -24,21 +31,67 @@ export const getMqttTopicId = (
 export type mqttTopicId = `${mqttTopicItem}/${enumMqttTopicType}`;
 // const id: mqttTopicId = 'irrigation/1/control';
 
-export type mqttMessage = {
-  message: string | mqttConfigMessage | mqttHealthMessage;
+export interface MqttMessage<T> {
+  type: enumMqttTopicType;
+  message: T;
   timestamp: string;
-};
+}
 
-export type mqttConfigMessage = {
-  highDuration?: number;
-  heartbeatInterval?: number;
-  // add other config properties here in the future
-  // e.g. pressure: number, enabled: boolean, etc.
-};
+export type ValveState = "LOW" | "HIGH";
 
-export type mqttHealthMessage = {
+export interface ValveStatusPayload {
+  state: ValveState;
+  weight: number;
+  weightDelta: number;
+  reason?: string;
+}
+
+export interface MqttStatusMessage extends MqttMessage<ValveStatusPayload> {
+  type: enumMqttTopicType.STATUS;
+}
+
+export interface MqttConfigMessage extends MqttMessage<mqttConfigMessage> {
+  type: enumMqttTopicType.CONFIG;
+}
+
+export interface ValveHealthPayload {
   ipAddress: string;
-};
+  active: boolean;
+  weight: number;
+}
+
+export interface MqttHealthMessage extends MqttMessage<mqttHealthMessage> {
+  type: enumMqttTopicType.HEALTH;
+}
+
+export interface MqttControlMessage extends MqttMessage<string> {
+  type: enumMqttTopicType.CONTROL;
+}
+
+export type MqttMessageAny =
+  | MqttStatusMessage
+  | MqttConfigMessage
+  | MqttHealthMessage
+  | MqttControlMessage;
+
+export interface HeartbeatIntervalConfig {
+  configType: "heartbeatInterval";
+  heartbeatInterval: number;
+}
+
+export interface WeightControlConfig {
+  configType: "weightControl";
+  targetWeightIncrease?: number;
+  toleranceWeight?: number;
+  toleranceDurationMs?: number;
+  weightReadIntervalMs?: number;
+}
+
+export type mqttConfigMessage =
+  | HeartbeatIntervalConfig
+  | WeightControlConfig;
+
+export type mqttHealthMessage = ValveHealthPayload;
 
 export type topicList = {
   topic: string;

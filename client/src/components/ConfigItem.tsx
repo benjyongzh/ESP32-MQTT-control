@@ -1,81 +1,170 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { MqttClient } from "mqtt";
 import {
   mqttTopicId,
   mqttTopicItem,
   getMqttTopicId,
   enumMqttTopicType,
-  mqttMessage,
-  mqttConfigMessage,
+  MqttMessageAny,
+  MqttConfigMessage,
 } from "../types";
 import { Label } from "./ui/label";
 import { Slider } from "./ui/slider";
 import { toast } from "sonner";
 import { useMqttClient } from "./hooks/useMqttClient";
 import {
-  SWITCH_MIN_OPEN_DURATION,
-  SWITCH_MAX_OPEN_DURATION,
-  CONTROLLER_DEVICE_ID_TO_TOPIC,
   HEARTBEAT_INTERVAL_MIN,
   HEARTBEAT_INTERVAL_MAX,
+  DEFAULT_TARGET_WEIGHT_INCREASE,
+  MIN_TARGET_WEIGHT_INCREASE,
+  DEFAULT_TOLERANCE_WEIGHT,
+  MIN_TOLERANCE_WEIGHT,
+  DEFAULT_TOLERANCE_DURATION_MS,
+  MIN_TOLERANCE_DURATION_MS,
+  MAX_TOLERANCE_DURATION_MS,
+  DEFAULT_WEIGHT_READ_INTERVAL_MS,
+  MIN_WEIGHT_READ_INTERVAL_MS,
+  MAX_WEIGHT_READ_INTERVAL_MS,
 } from "@/constants";
-import { formatTopicFromTopicString } from "@/utils";
+import { Input } from "./ui/input";
+import { Button } from "./ui/button";
 
 export default function ConfigItem(props: {
   client: MqttClient | null;
   topicItem: mqttTopicItem;
-  showHighDuration: boolean;
+  showWeightConfig: boolean;
 }) {
-  const { client, topicItem, showHighDuration } = props;
-  const [highDuration, setHighDuration] = useState<number>(3000); //milleseconds
+  const { client, topicItem, showWeightConfig } = props;
+  const [targetWeightIncrease, setTargetWeightIncrease] = useState<number>(
+    DEFAULT_TARGET_WEIGHT_INCREASE
+  );
+  const [toleranceWeight, setToleranceWeight] = useState<number>(
+    DEFAULT_TOLERANCE_WEIGHT
+  );
+  const [toleranceDurationMs, setToleranceDurationMs] = useState<number>(
+    DEFAULT_TOLERANCE_DURATION_MS
+  );
+  const [weightReadIntervalMs, setWeightReadIntervalMs] = useState<number>(
+    DEFAULT_WEIGHT_READ_INTERVAL_MS
+  );
   const [heartbeatIntervalDuration, setHeartbeatIntervalDuration] =
     useState<number>(5); //minutes
+
+  const toleranceDurationSeconds = useMemo(
+    () => toleranceDurationMs / 1000,
+    [toleranceDurationMs]
+  );
+  const weightReadIntervalSeconds = useMemo(
+    () => weightReadIntervalMs / 1000,
+    [weightReadIntervalMs]
+  );
 
   const topicConfig: mqttTopicId = useMemo(
     () => getMqttTopicId(topicItem, enumMqttTopicType.CONFIG),
     [topicItem]
   );
 
-  const onMessageReceived = (topic: string, payload: mqttMessage) => {
-    if (topic === topicConfig) {
-      const message: mqttConfigMessage = payload.message as mqttConfigMessage;
-      console.log("onMessageReceived:", message);
-      if (message.highDuration) setHighDuration(message.highDuration);
+  const onMessageReceived = (_topic: string, payload: MqttMessageAny) => {
+    switch (payload.type) {
+      case enumMqttTopicType.CONFIG:
+        switch (payload.message.configType) {
+          case "weightControl":
+            if (typeof payload.message.targetWeightIncrease === "number") {
+              setTargetWeightIncrease(payload.message.targetWeightIncrease);
+            }
+            if (typeof payload.message.toleranceWeight === "number") {
+              setToleranceWeight(payload.message.toleranceWeight);
+            }
+            if (typeof payload.message.toleranceDurationMs === "number") {
+              setToleranceDurationMs(payload.message.toleranceDurationMs);
+            }
+            if (typeof payload.message.weightReadIntervalMs === "number") {
+              setWeightReadIntervalMs(payload.message.weightReadIntervalMs);
+            }
+            break;
+          case "heartbeatInterval":
+            setHeartbeatIntervalDuration(
+              payload.message.heartbeatInterval
+            );
+            break;
+          default:
+            break;
+        }
+        break;
+      default:
+        break;
     }
   };
 
-  const { clientStatus } = useMqttClient({
+  useMqttClient({
     mqttClient: client,
     topics: [topicConfig],
     onMessage: onMessageReceived,
   });
 
-  useEffect(() => {
-    client?.on("message", (topic: string, payload: Buffer<ArrayBufferLike>) => {
-      if (topic === topicConfig) {
-        const payloadObject: mqttMessage = JSON.parse(payload.toString());
-        onMessageReceived(topic, payloadObject);
-      }
-    });
-  }, [clientStatus]);
+  const onWeightConfigCommit = useCallback(() => {
+    const clampedTarget = Math.max(
+      targetWeightIncrease,
+      MIN_TARGET_WEIGHT_INCREASE
+    );
+    const clampedTolerance = Math.max(
+      toleranceWeight,
+      MIN_TOLERANCE_WEIGHT
+    );
+    const clampedToleranceDuration = Math.min(
+      Math.max(toleranceDurationMs, MIN_TOLERANCE_DURATION_MS),
+      MAX_TOLERANCE_DURATION_MS
+    );
+    const clampedWeightInterval = Math.min(
+      Math.max(weightReadIntervalMs, MIN_WEIGHT_READ_INTERVAL_MS),
+      MAX_WEIGHT_READ_INTERVAL_MS
+    );
 
-  const onHighDurationCommit = useCallback(() => {
-    const message: mqttMessage = {
-      message: { highDuration },
+    setTargetWeightIncrease(clampedTarget);
+    setToleranceWeight(clampedTolerance);
+    setToleranceDurationMs(clampedToleranceDuration);
+    setWeightReadIntervalMs(clampedWeightInterval);
+
+    const message: MqttConfigMessage = {
+      type: enumMqttTopicType.CONFIG,
+      message: {
+        configType: "weightControl",
+        targetWeightIncrease: clampedTarget,
+        toleranceWeight: clampedTolerance,
+        toleranceDurationMs: clampedToleranceDuration,
+        weightReadIntervalMs: clampedWeightInterval,
+      },
       timestamp: new Date().toISOString(),
     };
-    console.log("message to publish: ", topicConfig, message);
+
     client?.publish(topicConfig, JSON.stringify(message), {
       retain: true,
     });
     toast.success(topicConfig, {
-      description: `HIGH duration updated to ${displayedHighDuration} seconds`,
+      description: `Weight control updated (target ${clampedTarget.toFixed(
+        1
+      )}, tolerance ${clampedTolerance.toFixed(1)}, timeout ${(
+        clampedToleranceDuration / 1000
+      ).toFixed(1)}s, interval ${(
+        clampedWeightInterval / 1000
+      ).toFixed(2)}s)`,
     });
-  }, [client, highDuration, topicConfig]);
+  }, [
+    client,
+    targetWeightIncrease,
+    toleranceWeight,
+    toleranceDurationMs,
+    weightReadIntervalMs,
+    topicConfig,
+  ]);
 
   const onHeartbeatIntervalCommit = useCallback(() => {
-    const message: mqttMessage = {
-      message: { heartbeatInterval: heartbeatIntervalDuration },
+    const message: MqttConfigMessage = {
+      type: enumMqttTopicType.CONFIG,
+      message: {
+        configType: "heartbeatInterval",
+        heartbeatInterval: heartbeatIntervalDuration,
+      },
       timestamp: new Date().toISOString(),
     };
     console.log("message to publish: ", topicConfig, message);
@@ -87,38 +176,107 @@ export default function ConfigItem(props: {
     });
   }, [client, heartbeatIntervalDuration, topicConfig]);
 
-  const displayedHighDuration = useMemo(
-    () => (highDuration / 1000).toFixed(1),
-    [highDuration]
-  );
-
-  const formattedTopicString: string = useMemo(
-    () => formatTopicFromTopicString(topicItem),
-    [CONTROLLER_DEVICE_ID_TO_TOPIC, topicItem]
-  );
-
   return (
     <div className="flex flex-col items-start justify-center gap-3">
       <div
         className={`flex flex-col items-start justify-center gap-2 w-full ${
-          showHighDuration ? "" : "hidden"
+          showWeightConfig ? "" : "hidden"
         }`}
       >
-        <Label htmlFor={topicItem}>HIGH Duration</Label>
-        <div className="flex gap-2 w-full">
-          <Slider
-            onValueChange={([value]) => setHighDuration(value)}
-            onValueCommit={() => onHighDurationCommit()}
-            value={[highDuration]}
-            defaultValue={[highDuration]}
-            min={SWITCH_MIN_OPEN_DURATION}
-            max={SWITCH_MAX_OPEN_DURATION}
-            step={100}
-            name={topicItem}
-            className="flex-3"
-          />
-          <p className="text-left flex-1">{displayedHighDuration} s</p>
+        <Label className="font-semibold" htmlFor={topicItem}>
+          Weight Control
+        </Label>
+        <div className="grid w-full grid-cols-1 gap-3">
+          <div className="flex flex-col gap-1">
+            <Label htmlFor={`${topicItem}-target-weight`}>
+              Target weight increase
+            </Label>
+            <Input
+              id={`${topicItem}-target-weight`}
+              type="number"
+              min={MIN_TARGET_WEIGHT_INCREASE}
+              step={0.1}
+              value={targetWeightIncrease}
+              onChange={(event) => {
+                const next = event.target.valueAsNumber;
+                if (!Number.isNaN(next)) {
+                  setTargetWeightIncrease(next);
+                }
+              }}
+            />
+            <p className="text-xs text-muted-foreground">
+              Weight gain required before closing the valve.
+            </p>
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor={`${topicItem}-tolerance-weight`}>
+              Tolerance weight
+            </Label>
+            <Input
+              id={`${topicItem}-tolerance-weight`}
+              type="number"
+              min={MIN_TOLERANCE_WEIGHT}
+              step={0.1}
+              value={toleranceWeight}
+              onChange={(event) => {
+                const next = event.target.valueAsNumber;
+                if (!Number.isNaN(next)) {
+                  setToleranceWeight(next);
+                }
+              }}
+            />
+            <p className="text-xs text-muted-foreground">
+              Minimum weight gain expected within the tolerance window.
+            </p>
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor={`${topicItem}-tolerance-duration`}>
+              Tolerance duration (seconds)
+            </Label>
+            <Input
+              id={`${topicItem}-tolerance-duration`}
+              type="number"
+              min={MIN_TOLERANCE_DURATION_MS / 1000}
+              max={MAX_TOLERANCE_DURATION_MS / 1000}
+              step={0.5}
+              value={toleranceDurationSeconds}
+              onChange={(event) => {
+                const next = event.target.valueAsNumber;
+                if (!Number.isNaN(next)) {
+                  setToleranceDurationMs(next * 1000);
+                }
+              }}
+            />
+            <p className="text-xs text-muted-foreground">
+              Time allowed for the tolerance weight increase after opening.
+            </p>
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor={`${topicItem}-weight-interval`}>
+              Sensor read interval (seconds)
+            </Label>
+            <Input
+              id={`${topicItem}-weight-interval`}
+              type="number"
+              min={MIN_WEIGHT_READ_INTERVAL_MS / 1000}
+              max={MAX_WEIGHT_READ_INTERVAL_MS / 1000}
+              step={0.1}
+              value={weightReadIntervalSeconds}
+              onChange={(event) => {
+                const next = event.target.valueAsNumber;
+                if (!Number.isNaN(next)) {
+                  setWeightReadIntervalMs(next * 1000);
+                }
+              }}
+            />
+            <p className="text-xs text-muted-foreground">
+              How frequently to sample the weight sensor while active.
+            </p>
+          </div>
         </div>
+        <Button onClick={onWeightConfigCommit} className="self-end">
+          Save weight config
+        </Button>
       </div>
       <div className="flex flex-col items-start justify-center gap-2 w-full">
         <Label htmlFor={topicItem}>Heartbeat Interval</Label>

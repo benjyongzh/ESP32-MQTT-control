@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import { MqttClient } from "mqtt";
-import { enumClientStatus } from "@/pages/Control";
-import { mqttMessage } from "@/types";
+import {
+  enumClientStatus,
+  enumMqttTopicType,
+  MqttMessageAny,
+} from "@/types";
 
 interface UseMQTTListenerProps {
   mqttClient: MqttClient | null;
   topics?: string[];
-  onMessage?: (topic: string, payload: mqttMessage) => void;
+  onMessage?: (topic: string, payload: MqttMessageAny) => void;
 }
 
 export const useMqttClient = ({
@@ -50,8 +53,17 @@ export const useMqttClient = ({
 
     const handleMessage = (topic: string, payload: Buffer<ArrayBufferLike>) => {
       if (topics?.includes(topic) && onMessage) {
-        const payloadObject: mqttMessage = JSON.parse(payload.toString());
-        onMessage(topic, payloadObject);
+        const parsed = JSON.parse(payload.toString()) as MqttMessageAny;
+        switch (parsed.type) {
+          case enumMqttTopicType.STATUS:
+          case enumMqttTopicType.CONFIG:
+          case enumMqttTopicType.HEALTH:
+          case enumMqttTopicType.CONTROL:
+            onMessage(topic, parsed);
+            break;
+          default:
+            console.warn("Unhandled MQTT message type");
+        }
       }
     };
 

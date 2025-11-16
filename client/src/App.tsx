@@ -1,9 +1,11 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
-import Control from "./pages/Control";
+import Menu from "./pages/Menu";
+import IrrigationControl from "./pages/IrrigationControl";
+import AirconControl from "./pages/AirconControl";
 import ProtectedRoute from "./pages/ProtectedRoute";
 import { ThemeProvider } from "@/components/theme-provider";
-import { Toaster, toast } from "sonner";
+import { Toaster } from "sonner";
 
 function App() {
   return (
@@ -22,14 +24,9 @@ function App() {
         <Routes>
           <Route index element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<Login />} />
-          <Route
-            path="/control"
-            element={
-              <ProtectedRoute>
-                <Control />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/menu" element={<ProtectedRoute><Menu /></ProtectedRoute>} />
+          <Route path="/irrigation" element={<ProtectedRoute><IrrigationControl /></ProtectedRoute>} />
+          <Route path="/aircon" element={<ProtectedRoute><AirconControl /></ProtectedRoute>} />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>
