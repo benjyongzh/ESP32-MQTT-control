@@ -48,10 +48,10 @@ export default function ControlItem(props: {
           } else {
             setCurrentWeight(null);
           }
-          if (typeof message.weightDelta === "number") {
-            setWeightDelta(message.weightDelta);
+          if (typeof message.weightChange === "number") {
+            setWeightChange(message.weightChange);
           } else {
-            setWeightDelta(null);
+            setWeightChange(null);
           }
           setLastWeightUpdate(payload.timestamp);
           setLastUpdated(payload.timestamp);
@@ -110,7 +110,7 @@ export default function ControlItem(props: {
   const [ipAddress, setIpAddress] = useState<string>("Unknown");
   const [healthLastUpdated, setHealthLastUpdated] = useState<string>("Unknown");
   const [currentWeight, setCurrentWeight] = useState<number | null>(null);
-  const [weightDelta, setWeightDelta] = useState<number | null>(null);
+  const [weightChange, setWeightChange] = useState<number | null>(null);
   const [lastWeightUpdate, setLastWeightUpdate] = useState<string>("Unknown");
   const [lastReason, setLastReason] = useState<string | null>(null);
   const [healthActive, setHealthActive] = useState<boolean>(false);
@@ -171,9 +171,9 @@ export default function ControlItem(props: {
     [currentWeight]
   );
 
-  const formattedWeightDelta: string = useMemo(
-    () => (weightDelta === null ? "Unknown" : weightDelta.toFixed(2)),
-    [weightDelta]
+  const formattedWeightChange: string = useMemo(
+    () => (weightChange === null ? "Unknown" : weightChange.toFixed(2)),
+    [weightChange]
   );
 
   const formattedLastWeightUpdate: string = useMemo(
@@ -244,7 +244,7 @@ export default function ControlItem(props: {
                   <div className="text-right after:content-[':']">
                     Weight Δ
                   </div>
-                  <div className="text-left">{formattedWeightDelta}</div>
+                  <div className="text-left">{formattedWeightChange}</div>
                   <div className="text-right after:content-[':']">
                     Last weight update
                   </div>

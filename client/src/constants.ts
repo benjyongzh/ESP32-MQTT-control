@@ -3,8 +3,8 @@ import { topicList, enumMqttTopicType } from "./types";
 export const HEARTBEAT_INTERVAL_MIN = 0.1; //minutes
 export const HEARTBEAT_INTERVAL_MAX = 20;
 
-export const DEFAULT_TARGET_WEIGHT_INCREASE = 100;
-export const MIN_TARGET_WEIGHT_INCREASE = 0;
+export const DEFAULT_TARGET_WEIGHT_CHANGE = 100;
+export const MIN_TARGET_WEIGHT_CHANGE = 50;
 export const DEFAULT_TOLERANCE_WEIGHT = 10;
 export const MIN_TOLERANCE_WEIGHT = 0;
 export const DEFAULT_TOLERANCE_DURATION_MS = 5000;

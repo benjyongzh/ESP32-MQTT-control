@@ -45,8 +45,8 @@ const int weightSensorPin = 34;
 const unsigned long DEFAULT_WEIGHT_READ_INTERVAL_MS = 500;
 const unsigned long MIN_WEIGHT_READ_INTERVAL_MS = 100;
 const unsigned long MAX_WEIGHT_READ_INTERVAL_MS = 10000;
-const float DEFAULT_TARGET_WEIGHT_INCREASE = 100.0f;
-const float MIN_TARGET_WEIGHT_INCREASE = 0.0f;
+const float DEFAULT_TARGET_WEIGHT_CHANGE = 100.0f;
+const float MIN_TARGET_WEIGHT_CHANGE = 50.0f;
 const float DEFAULT_TOLERANCE_WEIGHT = 10.0f;
 const float MIN_TOLERANCE_WEIGHT = 0.0f;
 const unsigned long DEFAULT_TOLERANCE_DURATION_MS = 5000;
@@ -60,7 +60,7 @@ struct ValveConfig {
   unsigned long lastWeightReadTime;
   float startWeight;
   float lastWeight;
-  float targetWeightIncrease;
+  float targetWeightChange;
   float toleranceWeight;
   unsigned long toleranceDurationMs;
   unsigned long weightReadIntervalMs;
@@ -68,10 +68,10 @@ struct ValveConfig {
 };
 
 ValveConfig valves[MAX_VALVES] = {
-  {32, false, 0, 0, 0.0f, 0.0f, DEFAULT_TARGET_WEIGHT_INCREASE, DEFAULT_TOLERANCE_WEIGHT, DEFAULT_TOLERANCE_DURATION_MS, DEFAULT_WEIGHT_READ_INTERVAL_MS, false},
-  {15, false, 0, 0, 0.0f, 0.0f, DEFAULT_TARGET_WEIGHT_INCREASE, DEFAULT_TOLERANCE_WEIGHT, DEFAULT_TOLERANCE_DURATION_MS, DEFAULT_WEIGHT_READ_INTERVAL_MS, false},
-  {17, false, 0, 0, 0.0f, 0.0f, DEFAULT_TARGET_WEIGHT_INCREASE, DEFAULT_TOLERANCE_WEIGHT, DEFAULT_TOLERANCE_DURATION_MS, DEFAULT_WEIGHT_READ_INTERVAL_MS, false},
-  {18, false, 0, 0, 0.0f, 0.0f, DEFAULT_TARGET_WEIGHT_INCREASE, DEFAULT_TOLERANCE_WEIGHT, DEFAULT_TOLERANCE_DURATION_MS, DEFAULT_WEIGHT_READ_INTERVAL_MS, false}
+  {32, false, 0, 0, 0.0f, 0.0f, DEFAULT_TARGET_WEIGHT_CHANGE, DEFAULT_TOLERANCE_WEIGHT, DEFAULT_TOLERANCE_DURATION_MS, DEFAULT_WEIGHT_READ_INTERVAL_MS, false},
+  {15, false, 0, 0, 0.0f, 0.0f, DEFAULT_TARGET_WEIGHT_CHANGE, DEFAULT_TOLERANCE_WEIGHT, DEFAULT_TOLERANCE_DURATION_MS, DEFAULT_WEIGHT_READ_INTERVAL_MS, false},
+  {17, false, 0, 0, 0.0f, 0.0f, DEFAULT_TARGET_WEIGHT_CHANGE, DEFAULT_TOLERANCE_WEIGHT, DEFAULT_TOLERANCE_DURATION_MS, DEFAULT_WEIGHT_READ_INTERVAL_MS, false},
+  {18, false, 0, 0, 0.0f, 0.0f, DEFAULT_TARGET_WEIGHT_CHANGE, DEFAULT_TOLERANCE_WEIGHT, DEFAULT_TOLERANCE_DURATION_MS, DEFAULT_WEIGHT_READ_INTERVAL_MS, false}
 };
 
 float lastWeightReading = 0.0f;
@@ -255,7 +255,7 @@ float readWeightSensor() {
 }
 
 void publishValveState(int valveIdInTopic, const char* state, float weight,
-                       float delta, bool retain = true,
+                       float weightChange, bool retain = true,
                        const char* reason = nullptr) {
   char topic_status[64];
   snprintf(topic_status, sizeof(topic_status), "%s/%i/%s", deviceId,
@@ -265,7 +265,7 @@ void publishValveState(int valveIdInTopic, const char* state, float weight,
   JsonObject message = doc["message"].to<JsonObject>();
   message["state"] = state;
   message["weight"] = weight;
-  message["weightDelta"] = delta;
+  message["weightChange"] = weightChange;
   if (reason) {
     message["reason"] = reason;
   }
@@ -309,8 +309,8 @@ void deactivateSwitch(int valveIdInTopic, const char* reason = nullptr) {
 
   digitalWrite(valve.pin, LOW);
   valve.active = false;
-  float delta = valve.startWeight - valve.lastWeight;
-  publishValveState(valveIdInTopic, "LOW", valve.lastWeight, delta, true,
+  float weightChange = valve.startWeight - valve.lastWeight;
+  publishValveState(valveIdInTopic, "LOW", valve.lastWeight, weightChange, true,
                     reason);
   valve.startWeight = 0.0f;
   valve.lastWeight = 0.0f;
@@ -441,17 +441,23 @@ void callback(char* topic, byte* payload, unsigned int length) {
     }
 
     if (String(configType) == "weightControl") {
-      if (doc["message"].containsKey("targetWeightIncrease")) {
-        float receivedTarget =
-            doc["message"]["targetWeightIncrease"].as<float>();
-        if (receivedTarget >= MIN_TARGET_WEIGHT_INCREASE) {
-          valve.targetWeightIncrease = receivedTarget;
+      const char* targetWeightKey =
+          doc["message"].containsKey("targetWeightChange")
+              ? "targetWeightChange"
+              : (doc["message"].containsKey("targetWeightIncrease")
+                     ? "targetWeightIncrease"
+                     : nullptr);
+
+      if (targetWeightKey) {
+        float receivedTarget = doc["message"][targetWeightKey].as<float>();
+        if (receivedTarget >= MIN_TARGET_WEIGHT_CHANGE) {
+          valve.targetWeightChange = receivedTarget;
           Serial.printf(
-              "✅ Valve %d target weight decrease updated to %f\n",
-              topic_id, valve.targetWeightIncrease);
+              "✅ Valve %d target weight change updated to %f\n",
+              topic_id, valve.targetWeightChange);
         } else {
           Serial.println(
-              "⚠️ targetWeightIncrease below minimum, ignoring update");
+              "⚠️ targetWeightChange below minimum, ignoring update");
         }
       }
 
@@ -581,27 +587,27 @@ void loop() {
       valve.lastWeight = currentWeight;
       valve.lastWeightReadTime = now;
 
-      float delta = valve.startWeight - valve.lastWeight;
+      float weightChange = valve.startWeight - valve.lastWeight;
       int pinState = digitalRead(valve.pin);
       publishValveState(i + 1, pinState == HIGH ? "HIGH" : "LOW",
-                        valve.lastWeight, delta, false);
+                        valve.lastWeight, weightChange, false);
 
-      if (delta >= valve.targetWeightIncrease) {
-        Serial.printf("Valve %d target weight decrease reached, closing valve\n",
+      if (weightChange >= valve.targetWeightChange) {
+        Serial.printf("Valve %d target weight change reached, closing valve\n",
                       i + 1);
         deactivateSwitch(i + 1, "target_reached");
         continue;
       }
 
-      if (!valve.toleranceSatisfied && delta >= valve.toleranceWeight) {
+      if (!valve.toleranceSatisfied && weightChange >= valve.toleranceWeight) {
         valve.toleranceSatisfied = true;
       }
     }
 
     if (!valve.toleranceSatisfied &&
         now - valve.startTime >= valve.toleranceDurationMs) {
-      float delta = valve.startWeight - valve.lastWeight;
-      if (delta < valve.toleranceWeight) {
+      float weightChange = valve.startWeight - valve.lastWeight;
+      if (weightChange < valve.toleranceWeight) {
         Serial.printf("Valve %d tolerance condition not met, closing valve\n",
                       i + 1);
         deactivateSwitch(i + 1, "tolerance_timeout");

@@ -15,8 +15,8 @@ import { useMqttClient } from "./hooks/useMqttClient";
 import {
   HEARTBEAT_INTERVAL_MIN,
   HEARTBEAT_INTERVAL_MAX,
-  DEFAULT_TARGET_WEIGHT_INCREASE,
-  MIN_TARGET_WEIGHT_INCREASE,
+  DEFAULT_TARGET_WEIGHT_CHANGE,
+  MIN_TARGET_WEIGHT_CHANGE,
   DEFAULT_TOLERANCE_WEIGHT,
   MIN_TOLERANCE_WEIGHT,
   DEFAULT_TOLERANCE_DURATION_MS,
@@ -35,8 +35,8 @@ export default function ConfigItem(props: {
   showWeightConfig: boolean;
 }) {
   const { client, topicItem, showWeightConfig } = props;
-  const [targetWeightIncrease, setTargetWeightIncrease] = useState<number>(
-    DEFAULT_TARGET_WEIGHT_INCREASE
+  const [targetWeightChange, setTargetWeightChange] = useState<number>(
+    DEFAULT_TARGET_WEIGHT_CHANGE
   );
   const [toleranceWeight, setToleranceWeight] = useState<number>(
     DEFAULT_TOLERANCE_WEIGHT
@@ -69,8 +69,8 @@ export default function ConfigItem(props: {
       case enumMqttTopicType.CONFIG:
         switch (payload.message.configType) {
           case "weightControl":
-            if (typeof payload.message.targetWeightIncrease === "number") {
-              setTargetWeightIncrease(payload.message.targetWeightIncrease);
+            if (typeof payload.message.targetWeightChange === "number") {
+              setTargetWeightChange(payload.message.targetWeightChange);
             }
             if (typeof payload.message.toleranceWeight === "number") {
               setToleranceWeight(payload.message.toleranceWeight);
@@ -104,8 +104,8 @@ export default function ConfigItem(props: {
 
   const onWeightConfigCommit = useCallback(() => {
     const clampedTarget = Math.max(
-      targetWeightIncrease,
-      MIN_TARGET_WEIGHT_INCREASE
+      targetWeightChange,
+      MIN_TARGET_WEIGHT_CHANGE
     );
     const clampedTolerance = Math.max(
       toleranceWeight,
@@ -120,7 +120,7 @@ export default function ConfigItem(props: {
       MAX_WEIGHT_READ_INTERVAL_MS
     );
 
-    setTargetWeightIncrease(clampedTarget);
+    setTargetWeightChange(clampedTarget);
     setToleranceWeight(clampedTolerance);
     setToleranceDurationMs(clampedToleranceDuration);
     setWeightReadIntervalMs(clampedWeightInterval);
@@ -129,7 +129,7 @@ export default function ConfigItem(props: {
       type: enumMqttTopicType.CONFIG,
       message: {
         configType: "weightControl",
-        targetWeightIncrease: clampedTarget,
+        targetWeightChange: clampedTarget,
         toleranceWeight: clampedTolerance,
         toleranceDurationMs: clampedToleranceDuration,
         weightReadIntervalMs: clampedWeightInterval,
@@ -151,7 +151,7 @@ export default function ConfigItem(props: {
     });
   }, [
     client,
-    targetWeightIncrease,
+    targetWeightChange,
     toleranceWeight,
     toleranceDurationMs,
     weightReadIntervalMs,
@@ -189,18 +189,18 @@ export default function ConfigItem(props: {
         <div className="grid w-full grid-cols-1 gap-3">
           <div className="flex flex-col gap-1">
             <Label htmlFor={`${topicItem}-target-weight`}>
-              Target weight decrease
+              Target weight change
             </Label>
             <Input
               id={`${topicItem}-target-weight`}
               type="number"
-              min={MIN_TARGET_WEIGHT_INCREASE}
+              min={MIN_TARGET_WEIGHT_CHANGE}
               step={0.1}
-              value={targetWeightIncrease}
+              value={targetWeightChange}
               onChange={(event) => {
                 const next = event.target.valueAsNumber;
                 if (!Number.isNaN(next)) {
-                  setTargetWeightIncrease(next);
+                  setTargetWeightChange(next);
                 }
               }}
             />
