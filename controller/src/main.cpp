@@ -309,7 +309,7 @@ void deactivateSwitch(int valveIdInTopic, const char* reason = nullptr) {
 
   digitalWrite(valve.pin, LOW);
   valve.active = false;
-  float delta = valve.lastWeight - valve.startWeight;
+  float delta = valve.startWeight - valve.lastWeight;
   publishValveState(valveIdInTopic, "LOW", valve.lastWeight, delta, true,
                     reason);
   valve.startWeight = 0.0f;
@@ -447,7 +447,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
         if (receivedTarget >= MIN_TARGET_WEIGHT_INCREASE) {
           valve.targetWeightIncrease = receivedTarget;
           Serial.printf(
-              "✅ Valve %d target weight increase updated to %f\n",
+              "✅ Valve %d target weight decrease updated to %f\n",
               topic_id, valve.targetWeightIncrease);
         } else {
           Serial.println(
@@ -581,13 +581,13 @@ void loop() {
       valve.lastWeight = currentWeight;
       valve.lastWeightReadTime = now;
 
-      float delta = valve.lastWeight - valve.startWeight;
+      float delta = valve.startWeight - valve.lastWeight;
       int pinState = digitalRead(valve.pin);
       publishValveState(i + 1, pinState == HIGH ? "HIGH" : "LOW",
                         valve.lastWeight, delta, false);
 
       if (delta >= valve.targetWeightIncrease) {
-        Serial.printf("Valve %d target weight increase reached, closing valve\n",
+        Serial.printf("Valve %d target weight decrease reached, closing valve\n",
                       i + 1);
         deactivateSwitch(i + 1, "target_reached");
         continue;
@@ -600,7 +600,7 @@ void loop() {
 
     if (!valve.toleranceSatisfied &&
         now - valve.startTime >= valve.toleranceDurationMs) {
-      float delta = valve.lastWeight - valve.startWeight;
+      float delta = valve.startWeight - valve.lastWeight;
       if (delta < valve.toleranceWeight) {
         Serial.printf("Valve %d tolerance condition not met, closing valve\n",
                       i + 1);

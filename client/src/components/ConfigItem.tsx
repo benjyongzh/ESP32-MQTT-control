@@ -189,7 +189,7 @@ export default function ConfigItem(props: {
         <div className="grid w-full grid-cols-1 gap-3">
           <div className="flex flex-col gap-1">
             <Label htmlFor={`${topicItem}-target-weight`}>
-              Target weight increase
+              Target weight decrease
             </Label>
             <Input
               id={`${topicItem}-target-weight`}
@@ -205,7 +205,7 @@ export default function ConfigItem(props: {
               }}
             />
             <p className="text-xs text-muted-foreground">
-              Weight gain required before closing the valve.
+              Weight loss required before closing the valve.
             </p>
           </div>
           <div className="flex flex-col gap-1">
@@ -226,7 +226,7 @@ export default function ConfigItem(props: {
               }}
             />
             <p className="text-xs text-muted-foreground">
-              Minimum weight gain expected within the tolerance window.
+              Minimum weight loss expected within the tolerance window.
             </p>
           </div>
           <div className="flex flex-col gap-1">
@@ -248,7 +248,7 @@ export default function ConfigItem(props: {
               }}
             />
             <p className="text-xs text-muted-foreground">
-              Time allowed for the tolerance weight increase after opening.
+              Time allowed for the tolerance weight decrease after opening.
             </p>
           </div>
           <div className="flex flex-col gap-1">
