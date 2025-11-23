@@ -42,7 +42,7 @@ export type ValveState = "LOW" | "HIGH";
 export interface ValveStatusPayload {
   state: ValveState;
   weight: number;
-  weightDelta: number;
+  weightChange: number;
   reason?: string;
 }
 
@@ -81,7 +81,7 @@ export interface HeartbeatIntervalConfig {
 
 export interface WeightControlConfig {
   configType: "weightControl";
-  targetWeightIncrease?: number;
+  targetWeightChange?: number;
   toleranceWeight?: number;
   toleranceDurationMs?: number;
   weightReadIntervalMs?: number;
