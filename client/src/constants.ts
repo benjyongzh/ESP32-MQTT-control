@@ -16,8 +16,8 @@ export const MAX_WEIGHT_READ_INTERVAL_MS = 10000;
 
 export const CONTROLLER_DEVICE_ID_TO_TOPIC: Record<string, topicList> = {
   "esp32-DEE3": { topic: "studyroom-monsii", quantity: 1 },
-  "esp32-E6D7": { topic: "water-monsiis", quantity: 2 },
-  "esp32-77EE": { topic: "avii-moss", quantity: 1 },
+  "esp32-E6D7": { topic: "leca-monsii", quantity: 1 },
+  // "esp32-77EE": { topic: "avii-moss", quantity: 1 },
 };
 
 export const AIRCON_DEVICE_ID = "mitsubishi-aircon";

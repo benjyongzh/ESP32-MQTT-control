@@ -5,6 +5,13 @@
 #include <ArduinoJson.h>
 #include <secrets.h>
 #include <EEPROM.h>
+#include "HX711.h"
+
+// HX711 scale
+#define HX711_DT 16
+#define HX711_SCK 17
+const float calibration_factor = 259.6;
+HX711 scale;
 
 // device ID
 #define EEPROM_SIZE 8
@@ -41,7 +48,7 @@ float healthInterval = 5;// 5 minutes
 // const int valve_status_pin = 32;  //23
 #define MAX_VALVES 4
 
-const int weightSensorPin = 34;
+
 const unsigned long DEFAULT_WEIGHT_READ_INTERVAL_MS = 500;
 const unsigned long MIN_WEIGHT_READ_INTERVAL_MS = 100;
 const unsigned long MAX_WEIGHT_READ_INTERVAL_MS = 10000;
@@ -52,6 +59,7 @@ const float MIN_TOLERANCE_WEIGHT = 0.0f;
 const unsigned long DEFAULT_TOLERANCE_DURATION_MS = 5000;
 const unsigned long MIN_TOLERANCE_DURATION_MS = 1000;
 const unsigned long MAX_TOLERANCE_DURATION_MS = 600000;
+const uint8_t WEIGHT_SAMPLE_COUNT = 1; // keep reads fast to respect short intervals
 
 struct ValveConfig {
   uint8_t pin;
@@ -248,8 +256,7 @@ int topicIdToIndex(int topicId) {
 }
 
 float readWeightSensor() {
-  int rawValue = analogRead(weightSensorPin);
-  float weight = static_cast<float>(rawValue);
+  float weight = scale.get_units(WEIGHT_SAMPLE_COUNT);
   lastWeightReading = weight;
   return weight;
 }
@@ -262,6 +269,7 @@ void publishValveState(int valveIdInTopic, const char* state, float weight,
            valveIdInTopic, topic_type_status);
 
   JsonDocument doc;
+  doc["type"] = topic_type_status;
   JsonObject message = doc["message"].to<JsonObject>();
   message["state"] = state;
   message["weight"] = weight;
@@ -537,6 +545,7 @@ void publishHealthStatus() {
     snprintf(topic, sizeof(topic), "%s/%i/%s", deviceId, i+1, topic_type_health);
 
     JsonDocument doc;
+    doc["type"] = topic_type_health;
     JsonObject message = doc["message"].to<JsonObject>();
     message["ipAddress"] = ipStr;
     message["active"] = digitalRead(valves[i].pin) == HIGH;
@@ -549,10 +558,13 @@ void setup() {
   Serial.begin(115200);
   pinMode(wifi_connection_status_pin, OUTPUT);
   pinMode(mqtt_connection_status_pin, OUTPUT);
-  pinMode(weightSensorPin, INPUT);
   for (int i=0; i < MAX_VALVES; i++ ) {
     pinMode(valves[i].pin, OUTPUT);
   }
+
+  scale.begin(HX711_DT, HX711_SCK);
+  scale.set_scale(calibration_factor);
+  scale.tare(20);
 
   setDeviceId();
   connectWiFi();

@@ -24,6 +24,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import ConfigItem from "./ConfigItem";
+import { Button } from "./ui/button";
+import { RotateCcw } from "lucide-react";
 
 export enum enumSwitchStatus {
   LOW = "LOW",
@@ -100,7 +102,7 @@ export default function ControlItem(props: {
     [topicItem]
   );
 
-  const { clientStatus } = useMqttClient({
+  const { clientStatus, refreshTopics } = useMqttClient({
     mqttClient: client,
     topics: [topicControl, topicStatus, topicHealth],
     onMessage: onMessageReceived,
@@ -208,10 +210,18 @@ export default function ControlItem(props: {
             </div>
           </DialogTrigger>
           <DialogContent className="max-w-xs md:max-w-sm">
-            <DialogHeader>
-              <DialogTitle className="text-left">
+            <DialogHeader className="flex flex-row items-center justify-between gap-2">
+              <DialogTitle className="text-left truncate">
                 {formattedTopicString}
               </DialogTitle>
+              <Button
+                size="icon"
+                variant="ghost"
+                aria-label="Refresh valve info"
+                onClick={() => refreshTopics()}
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
             </DialogHeader>
             <div className="flex flex-col items-stretch justify-between mt-3">
               <section className="flex flex-col items-stretch justify-between mb-1 pb-2">
