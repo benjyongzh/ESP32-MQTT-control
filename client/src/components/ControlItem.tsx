@@ -209,7 +209,7 @@ export default function ControlItem(props: {
               {formattedTopicString}
             </div>
           </DialogTrigger>
-          <DialogContent className="max-w-xs md:max-w-sm">
+          <DialogContent className="max-w-xs md:max-w-sm" forceMount>
             <DialogHeader className="flex flex-row items-center justify-between gap-2">
               <DialogTitle className="text-left truncate">
                 {formattedTopicString}

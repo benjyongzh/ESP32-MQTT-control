@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { MqttClient } from "mqtt";
 import {
   mqttTopicId,
@@ -44,16 +44,19 @@ export default function ConfigItem(props: {
   const [toleranceDurationMs, setToleranceDurationMs] = useState<number>(
     DEFAULT_TOLERANCE_DURATION_MS
   );
+  const [toleranceDurationInput, setToleranceDurationInput] = useState<string>(
+    (DEFAULT_TOLERANCE_DURATION_MS / 1000).toString()
+  );
   const [weightReadIntervalMs, setWeightReadIntervalMs] = useState<number>(
     DEFAULT_WEIGHT_READ_INTERVAL_MS
   );
   const [heartbeatIntervalDuration, setHeartbeatIntervalDuration] =
     useState<number>(5); //minutes
 
-  const toleranceDurationSeconds = useMemo(
-    () => toleranceDurationMs / 1000,
-    [toleranceDurationMs]
-  );
+  // const toleranceDurationSeconds = useMemo(
+  //   () => toleranceDurationMs / 1000,
+  //   [toleranceDurationMs]
+  // );
   const weightReadIntervalSeconds = useMemo(
     () => weightReadIntervalMs / 1000,
     [weightReadIntervalMs]
@@ -63,6 +66,10 @@ export default function ConfigItem(props: {
     () => getMqttTopicId(topicItem, enumMqttTopicType.CONFIG),
     [topicItem]
   );
+
+  useEffect(() => {
+    setToleranceDurationInput((toleranceDurationMs / 1000).toString());
+  }, [toleranceDurationMs]);
 
   const onMessageReceived = (_topic: string, payload: MqttMessageAny) => {
     switch (payload.type) {
@@ -239,12 +246,20 @@ export default function ConfigItem(props: {
               min={MIN_TOLERANCE_DURATION_MS / 1000}
               max={MAX_TOLERANCE_DURATION_MS / 1000}
               step={0.5}
-              value={toleranceDurationSeconds}
+              value={toleranceDurationInput}
               onChange={(event) => {
-                const next = event.target.valueAsNumber;
-                if (!Number.isNaN(next)) {
-                  setToleranceDurationMs(next * 1000);
-                }
+                setToleranceDurationInput(event.target.value);
+              }}
+              onBlur={() => {
+                const next = parseFloat(toleranceDurationInput);
+                const clampedSeconds = Number.isFinite(next)
+                  ? Math.min(
+                      Math.max(next, MIN_TOLERANCE_DURATION_MS / 1000),
+                      MAX_TOLERANCE_DURATION_MS / 1000
+                    )
+                  : MIN_TOLERANCE_DURATION_MS / 1000;
+                setToleranceDurationMs(clampedSeconds * 1000);
+                setToleranceDurationInput(clampedSeconds.toString());
               }}
             />
             <p className="text-xs text-muted-foreground">
