@@ -15,7 +15,7 @@ import { dateFormatter, formatTopicFromTopicString } from "../utils";
 import { Switch } from "./ui/switch";
 import SwitchStatusText from "./SwitchStatusText";
 import { useMqttClient } from "./hooks/useMqttClient";
-import { CONTROLLER_DEVICE_ID_TO_TOPIC } from "@/constants";
+import { CONTROLLER_DEVICE_ID_TO_TOPIC, DEFAULT_TARGET_WEIGHT_CHANGE } from "@/constants";
 import {
   Dialog,
   DialogContent,
@@ -71,6 +71,16 @@ export default function ControlItem(props: {
           }
         }
         break;
+      case enumMqttTopicType.CONFIG:
+        if (
+          topic === topicConfig &&
+          payload.message.configType === "weightControl"
+        ) {
+          if (typeof payload.message.targetWeightChange === "number") {
+            setTargetWeightChange(payload.message.targetWeightChange);
+          }
+        }
+        break;
       case enumMqttTopicType.HEALTH:
         if (topic === topicHealth) {
           const message = payload.message as ValveHealthPayload;
@@ -101,10 +111,14 @@ export default function ControlItem(props: {
     () => getMqttTopicId(topicItem, enumMqttTopicType.HEALTH),
     [topicItem]
   );
+  const topicConfig: mqttTopicId = useMemo(
+    () => getMqttTopicId(topicItem, enumMqttTopicType.CONFIG),
+    [topicItem]
+  );
 
   const { clientStatus, refreshTopics } = useMqttClient({
     mqttClient: client,
-    topics: [topicControl, topicStatus, topicHealth],
+    topics: [topicControl, topicStatus, topicHealth, topicConfig],
     onMessage: onMessageReceived,
   });
   const [status, setStatus] = useState<enumSwitchStatus>(enumSwitchStatus.LOW);
@@ -117,6 +131,9 @@ export default function ControlItem(props: {
   const [lastReason, setLastReason] = useState<string | null>(null);
   const [healthActive, setHealthActive] = useState<boolean>(false);
   const [healthWeight, setHealthWeight] = useState<number | null>(null);
+  const [targetWeightChange, setTargetWeightChange] = useState<number>(
+    DEFAULT_TARGET_WEIGHT_CHANGE
+  );
 
   useEffect(() => {
     if (clientStatus === enumClientStatus.ERROR) {
@@ -192,6 +209,21 @@ export default function ControlItem(props: {
     [healthWeight]
   );
 
+  const formattedTargetWeightChange: string = useMemo(
+    () => targetWeightChange.toFixed(2),
+    [targetWeightChange]
+  );
+
+  const weightChangeDisplay: string = useMemo(() => {
+    if (status === enumSwitchStatus.HIGH) {
+      const weightChangeText =
+        weightChange === null ? "—" : weightChange.toFixed(2);
+      return `${weightChangeText}/${formattedTargetWeightChange}`;
+    }
+
+    return formattedTargetWeightChange;
+  }, [formattedTargetWeightChange, status, weightChange]);
+
   const formattedTopicString: string = useMemo(
     () => formatTopicFromTopicString(topicItem),
     [CONTROLLER_DEVICE_ID_TO_TOPIC, topicItem]
@@ -205,8 +237,11 @@ export default function ControlItem(props: {
       <div className="flex justify-start">
         <Dialog>
           <DialogTrigger asChild>
-            <div className="flex w-full justify-start items-center">
-              {formattedTopicString}
+            <div className="flex w-full items-center justify-between gap-3">
+              <span className="flex-1 truncate">{formattedTopicString}</span>
+              <span className="text-sm text-muted-foreground whitespace-nowrap">
+                {weightChangeDisplay}
+              </span>
             </div>
           </DialogTrigger>
           <DialogContent className="max-w-xs md:max-w-sm" forceMount>
