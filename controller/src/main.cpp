@@ -49,9 +49,12 @@ float healthInterval = 5;// 5 minutes
 #define MAX_VALVES 4
 
 
-const unsigned long DEFAULT_WEIGHT_READ_INTERVAL_MS = 500;
-const unsigned long MIN_WEIGHT_READ_INTERVAL_MS = 100;
-const unsigned long MAX_WEIGHT_READ_INTERVAL_MS = 10000;
+const unsigned long DEFAULT_SENSOR_READ_INTERVAL_MS = 500;
+const unsigned long MIN_SENSOR_READ_INTERVAL_MS = 100;
+const unsigned long MAX_SENSOR_READ_INTERVAL_MS = 1000;
+const unsigned long DEFAULT_HIGH_DURATION_MS = 3000;
+const unsigned long MIN_HIGH_DURATION_MS = 1000;
+const unsigned long MAX_HIGH_DURATION_MS = 600000;
 const float DEFAULT_TARGET_WEIGHT_CHANGE = 100.0f;
 const float MIN_TARGET_WEIGHT_CHANGE = 50.0f;
 const float DEFAULT_TOLERANCE_WEIGHT = 10.0f;
@@ -61,25 +64,33 @@ const unsigned long MIN_TOLERANCE_DURATION_MS = 1000;
 const unsigned long MAX_TOLERANCE_DURATION_MS = 600000;
 const uint8_t WEIGHT_SAMPLE_COUNT = 1; // keep reads fast to respect short intervals
 
+enum ControlMode {
+  CONTROL_MODE_WEIGHT,
+  CONTROL_MODE_TIME,
+};
+
 struct ValveConfig {
   uint8_t pin;
   bool active;
   unsigned long startTime;
   unsigned long lastWeightReadTime;
+  unsigned long lastProgressPublishTime;
   float startWeight;
   float lastWeight;
+  ControlMode controlMode;
+  unsigned long highDurationMs;
   float targetWeightChange;
   float toleranceWeight;
   unsigned long toleranceDurationMs;
-  unsigned long weightReadIntervalMs;
+  unsigned long sensorReadIntervalMs;
   bool toleranceSatisfied;
 };
 
 ValveConfig valves[MAX_VALVES] = {
-  {32, false, 0, 0, 0.0f, 0.0f, DEFAULT_TARGET_WEIGHT_CHANGE, DEFAULT_TOLERANCE_WEIGHT, DEFAULT_TOLERANCE_DURATION_MS, DEFAULT_WEIGHT_READ_INTERVAL_MS, false},
-  {15, false, 0, 0, 0.0f, 0.0f, DEFAULT_TARGET_WEIGHT_CHANGE, DEFAULT_TOLERANCE_WEIGHT, DEFAULT_TOLERANCE_DURATION_MS, DEFAULT_WEIGHT_READ_INTERVAL_MS, false},
-  {17, false, 0, 0, 0.0f, 0.0f, DEFAULT_TARGET_WEIGHT_CHANGE, DEFAULT_TOLERANCE_WEIGHT, DEFAULT_TOLERANCE_DURATION_MS, DEFAULT_WEIGHT_READ_INTERVAL_MS, false},
-  {18, false, 0, 0, 0.0f, 0.0f, DEFAULT_TARGET_WEIGHT_CHANGE, DEFAULT_TOLERANCE_WEIGHT, DEFAULT_TOLERANCE_DURATION_MS, DEFAULT_WEIGHT_READ_INTERVAL_MS, false}
+  {32, false, 0, 0, 0, 0.0f, 0.0f, CONTROL_MODE_WEIGHT, DEFAULT_HIGH_DURATION_MS, DEFAULT_TARGET_WEIGHT_CHANGE, DEFAULT_TOLERANCE_WEIGHT, DEFAULT_TOLERANCE_DURATION_MS, DEFAULT_SENSOR_READ_INTERVAL_MS, false},
+  {15, false, 0, 0, 0, 0.0f, 0.0f, CONTROL_MODE_WEIGHT, DEFAULT_HIGH_DURATION_MS, DEFAULT_TARGET_WEIGHT_CHANGE, DEFAULT_TOLERANCE_WEIGHT, DEFAULT_TOLERANCE_DURATION_MS, DEFAULT_SENSOR_READ_INTERVAL_MS, false},
+  {17, false, 0, 0, 0, 0.0f, 0.0f, CONTROL_MODE_WEIGHT, DEFAULT_HIGH_DURATION_MS, DEFAULT_TARGET_WEIGHT_CHANGE, DEFAULT_TOLERANCE_WEIGHT, DEFAULT_TOLERANCE_DURATION_MS, DEFAULT_SENSOR_READ_INTERVAL_MS, false},
+  {18, false, 0, 0, 0, 0.0f, 0.0f, CONTROL_MODE_WEIGHT, DEFAULT_HIGH_DURATION_MS, DEFAULT_TARGET_WEIGHT_CHANGE, DEFAULT_TOLERANCE_WEIGHT, DEFAULT_TOLERANCE_DURATION_MS, DEFAULT_SENSOR_READ_INTERVAL_MS, false}
 };
 
 float lastWeightReading = 0.0f;
@@ -255,6 +266,17 @@ int topicIdToIndex(int topicId) {
   return index;
 }
 
+const char* controlModeToString(ControlMode mode) {
+  return mode == CONTROL_MODE_TIME ? "time" : "weight";
+}
+
+ControlMode parseControlMode(const char* mode) {
+  if (mode && String(mode) == "time") {
+    return CONTROL_MODE_TIME;
+  }
+  return CONTROL_MODE_WEIGHT;
+}
+
 float readWeightSensor() {
   float weight = scale.get_units(WEIGHT_SAMPLE_COUNT);
   lastWeightReading = weight;
@@ -274,6 +296,26 @@ void publishValveState(int valveIdInTopic, const char* state, float weight,
   message["state"] = state;
   message["weight"] = weight;
   message["weightChange"] = weightChange;
+  int index = topicIdToIndex(valveIdInTopic);
+  if (index >= 0) {
+    ValveConfig &valve = valves[index];
+    message["controlMode"] = controlModeToString(valves[index].controlMode);
+    if (valve.controlMode == CONTROL_MODE_TIME) {
+      float elapsedSeconds = valve.startTime == 0
+                                 ? 0.0f
+                                 : (millis() - valve.startTime) / 1000.0f;
+      float targetSeconds = valve.highDurationMs / 1000.0f;
+      message["progressValue"] = elapsedSeconds > targetSeconds
+                                     ? targetSeconds
+                                     : elapsedSeconds;
+      message["targetValue"] = targetSeconds;
+      message["progressUnit"] = "s";
+    } else {
+      message["progressValue"] = weightChange;
+      message["targetValue"] = valve.targetWeightChange;
+      message["progressUnit"] = "g";
+    }
+  }
   if (reason) {
     message["reason"] = reason;
   }
@@ -295,10 +337,13 @@ void activateSwitch(int valveIdInTopic) {
   digitalWrite(valve.pin, HIGH);
   valve.active = true;
   valve.startTime = millis();
-  valve.toleranceSatisfied = valve.toleranceWeight <= MIN_TOLERANCE_WEIGHT;
+  valve.toleranceSatisfied =
+      valve.controlMode == CONTROL_MODE_WEIGHT &&
+      valve.toleranceWeight <= MIN_TOLERANCE_WEIGHT;
   valve.startWeight = readWeightSensor();
   valve.lastWeight = valve.startWeight;
   valve.lastWeightReadTime = millis();
+  valve.lastProgressPublishTime = millis();
 
   publishValveState(valveIdInTopic, "HIGH", valve.startWeight, 0.0f, true);
 }
@@ -324,6 +369,7 @@ void deactivateSwitch(int valveIdInTopic, const char* reason = nullptr) {
   valve.lastWeight = 0.0f;
   valve.startTime = 0;
   valve.lastWeightReadTime = 0;
+  valve.lastProgressPublishTime = 0;
   valve.toleranceSatisfied = false;
 }
 
@@ -442,95 +488,98 @@ void callback(char* topic, byte* payload, unsigned int length) {
     }
 
     ValveConfig &valve = valves[index];
-    const char* configType = doc["message"]["configType"];
-    if (!configType) {
-      Serial.println("⚠️ JSON missing 'message.configType'");
-      return;
+
+    if (doc["message"].containsKey("controlMode")) {
+      const char* receivedMode = doc["message"]["controlMode"];
+      valve.controlMode = parseControlMode(receivedMode);
+      Serial.printf("✅ Valve %d control mode updated to %s\n", topic_id,
+                    controlModeToString(valve.controlMode));
     }
 
-    if (String(configType) == "weightControl") {
-      const char* targetWeightKey =
-          doc["message"].containsKey("targetWeightChange")
-              ? "targetWeightChange"
-              : (doc["message"].containsKey("targetWeightIncrease")
-                     ? "targetWeightIncrease"
-                     : nullptr);
-
-      if (targetWeightKey) {
-        float receivedTarget = doc["message"][targetWeightKey].as<float>();
-        if (receivedTarget >= MIN_TARGET_WEIGHT_CHANGE) {
-          valve.targetWeightChange = receivedTarget;
-          Serial.printf(
-              "✅ Valve %d target weight change updated to %f\n",
-              topic_id, valve.targetWeightChange);
-        } else {
-          Serial.println(
-              "⚠️ targetWeightChange below minimum, ignoring update");
-        }
+    if (doc["message"].containsKey("highDuration")) {
+      unsigned long receivedDuration =
+          doc["message"]["highDuration"].as<unsigned long>();
+      if (receivedDuration < MIN_HIGH_DURATION_MS) {
+        receivedDuration = MIN_HIGH_DURATION_MS;
+      } else if (receivedDuration > MAX_HIGH_DURATION_MS) {
+        receivedDuration = MAX_HIGH_DURATION_MS;
       }
+      valve.highDurationMs = receivedDuration;
+      Serial.printf("✅ Valve %d high duration updated to %lums\n", topic_id,
+                    valve.highDurationMs);
+    }
 
-      if (doc["message"].containsKey("toleranceWeight")) {
-        float receivedTolerance =
-            doc["message"]["toleranceWeight"].as<float>();
-        if (receivedTolerance >= MIN_TOLERANCE_WEIGHT) {
-          valve.toleranceWeight = receivedTolerance;
-          Serial.printf(
-              "✅ Valve %d tolerance weight updated to %f\n",
-              topic_id, valve.toleranceWeight);
-        } else {
-          Serial.println(
-              "⚠️ toleranceWeight below minimum, ignoring update");
-        }
-      }
+    const char* targetWeightKey =
+        doc["message"].containsKey("targetWeightChange")
+            ? "targetWeightChange"
+            : (doc["message"].containsKey("targetWeightIncrease")
+                   ? "targetWeightIncrease"
+                   : nullptr);
 
-      if (doc["message"].containsKey("toleranceDurationMs")) {
-        unsigned long receivedDuration =
-            doc["message"]["toleranceDurationMs"].as<unsigned long>();
-        if (receivedDuration < MIN_TOLERANCE_DURATION_MS) {
-          receivedDuration = MIN_TOLERANCE_DURATION_MS;
-        } else if (receivedDuration > MAX_TOLERANCE_DURATION_MS) {
-          receivedDuration = MAX_TOLERANCE_DURATION_MS;
-        }
-        valve.toleranceDurationMs = receivedDuration;
-        Serial.printf(
-            "✅ Valve %d tolerance duration updated to %lums\n",
-            topic_id, valve.toleranceDurationMs);
-      }
-
-      if (doc["message"].containsKey("weightReadIntervalMs")) {
-        unsigned long receivedInterval =
-            doc["message"]["weightReadIntervalMs"].as<unsigned long>();
-        if (receivedInterval < MIN_WEIGHT_READ_INTERVAL_MS) {
-          receivedInterval = MIN_WEIGHT_READ_INTERVAL_MS;
-        } else if (receivedInterval > MAX_WEIGHT_READ_INTERVAL_MS) {
-          receivedInterval = MAX_WEIGHT_READ_INTERVAL_MS;
-        }
-        valve.weightReadIntervalMs = receivedInterval;
-        Serial.printf(
-            "✅ Valve %d weight read interval updated to %lums\n",
-            topic_id, valve.weightReadIntervalMs);
-      }
-    } else if (String(configType) == "heartbeatInterval") {
-      if (doc["message"]["heartbeatInterval"]) {
-        float receivedInterval =
-            doc["message"]["heartbeatInterval"].as<float>();
-        if (receivedInterval > healthInterval_max_duration) {
-          Serial.printf("Received heartbeat interval duration of %fminutes\n",
-                        receivedInterval);
-          healthInterval = healthInterval_max_duration;
-        } else if (receivedInterval < healthInterval_min_duration) {
-          Serial.printf("Received heartbeat interval duration of %fminutes\n",
-                        receivedInterval);
-          healthInterval = healthInterval_min_duration;
-        } else {
-          healthInterval = receivedInterval;
-        }
-        Serial.printf(
-            "✅ Heartbeat interval duration for index %i updated to %fminutes\n",
-            topic_id, healthInterval);
+    if (targetWeightKey) {
+      float receivedTarget = doc["message"][targetWeightKey].as<float>();
+      if (receivedTarget >= MIN_TARGET_WEIGHT_CHANGE) {
+        valve.targetWeightChange = receivedTarget;
+        Serial.printf("✅ Valve %d target weight change updated to %f\n",
+                      topic_id, valve.targetWeightChange);
       } else {
-        Serial.println("⚠️ JSON missing 'message.heartbeatInterval'");
+        Serial.println("⚠️ targetWeightChange below minimum, ignoring update");
       }
+    }
+
+    if (doc["message"].containsKey("toleranceWeight")) {
+      float receivedTolerance = doc["message"]["toleranceWeight"].as<float>();
+      if (receivedTolerance >= MIN_TOLERANCE_WEIGHT) {
+        valve.toleranceWeight = receivedTolerance;
+        Serial.printf("✅ Valve %d tolerance weight updated to %f\n", topic_id,
+                      valve.toleranceWeight);
+      } else {
+        Serial.println("⚠️ toleranceWeight below minimum, ignoring update");
+      }
+    }
+
+    if (doc["message"].containsKey("toleranceDurationMs")) {
+      unsigned long receivedDuration =
+          doc["message"]["toleranceDurationMs"].as<unsigned long>();
+      if (receivedDuration < MIN_TOLERANCE_DURATION_MS) {
+        receivedDuration = MIN_TOLERANCE_DURATION_MS;
+      } else if (receivedDuration > MAX_TOLERANCE_DURATION_MS) {
+        receivedDuration = MAX_TOLERANCE_DURATION_MS;
+      }
+      valve.toleranceDurationMs = receivedDuration;
+      Serial.printf("✅ Valve %d tolerance duration updated to %lums\n",
+                    topic_id, valve.toleranceDurationMs);
+    }
+
+      if (doc["message"].containsKey("sensorReadIntervalMs")) {
+        unsigned long receivedInterval =
+            doc["message"]["sensorReadIntervalMs"].as<unsigned long>();
+        if (receivedInterval < MIN_SENSOR_READ_INTERVAL_MS) {
+          receivedInterval = MIN_SENSOR_READ_INTERVAL_MS;
+        } else if (receivedInterval > MAX_SENSOR_READ_INTERVAL_MS) {
+          receivedInterval = MAX_SENSOR_READ_INTERVAL_MS;
+        }
+      valve.sensorReadIntervalMs = receivedInterval;
+      Serial.printf("✅ Valve %d sensor read interval updated to %lums\n",
+                    topic_id, valve.sensorReadIntervalMs);
+    }
+
+    if (doc["message"].containsKey("heartbeatInterval")) {
+      float receivedInterval = doc["message"]["heartbeatInterval"].as<float>();
+      if (receivedInterval > healthInterval_max_duration) {
+        Serial.printf("Received heartbeat interval duration of %fminutes\n",
+                      receivedInterval);
+        healthInterval = healthInterval_max_duration;
+      } else if (receivedInterval < healthInterval_min_duration) {
+        Serial.printf("Received heartbeat interval duration of %fminutes\n",
+                      receivedInterval);
+        healthInterval = healthInterval_min_duration;
+      } else {
+        healthInterval = receivedInterval;
+      }
+      Serial.printf(
+          "✅ Heartbeat interval duration for index %i updated to %fminutes\n",
+          topic_id, healthInterval);
     }
   }
 }
@@ -594,7 +643,19 @@ void loop() {
 
     unsigned long now = millis();
 
-    if (now - valve.lastWeightReadTime >= valve.weightReadIntervalMs) {
+    if (valve.controlMode == CONTROL_MODE_TIME) {
+      if (now - valve.lastProgressPublishTime >= valve.sensorReadIntervalMs) {
+        publishValveState(i + 1, "HIGH", valve.lastWeight, 0.0f, false);
+        valve.lastProgressPublishTime = now;
+      }
+      if (now - valve.startTime >= valve.highDurationMs) {
+        Serial.printf("Valve %d timer elapsed, closing valve\n", i + 1);
+        deactivateSwitch(i + 1, "duration_elapsed");
+      }
+      continue;
+    }
+
+    if (now - valve.lastWeightReadTime >= valve.sensorReadIntervalMs) {
       float currentWeight = readWeightSensor();
       valve.lastWeight = currentWeight;
       valve.lastWeightReadTime = now;
@@ -603,6 +664,7 @@ void loop() {
       int pinState = digitalRead(valve.pin);
       publishValveState(i + 1, pinState == HIGH ? "HIGH" : "LOW",
                         valve.lastWeight, weightChange, false);
+      valve.lastProgressPublishTime = now;
 
       if (weightChange >= valve.targetWeightChange) {
         Serial.printf("Valve %d target weight change reached, closing valve\n",

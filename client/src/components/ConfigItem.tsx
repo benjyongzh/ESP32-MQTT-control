@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { MqttClient } from "mqtt";
 import {
+  enumControlMode,
   mqttTopicId,
   mqttTopicItem,
   getMqttTopicId,
@@ -8,38 +8,55 @@ import {
   MqttMessageAny,
   MqttConfigMessage,
 } from "../types";
-import { Label } from "./ui/label";
 import { Slider } from "./ui/slider";
 import { toast } from "sonner";
 import { useMqttClient } from "./hooks/useMqttClient";
+import { ControlClient } from "@/lib/control-client";
 import {
+  DEFAULT_HIGH_DURATION_MS,
   HEARTBEAT_INTERVAL_MIN,
   HEARTBEAT_INTERVAL_MAX,
   DEFAULT_TARGET_WEIGHT_CHANGE,
   MIN_TARGET_WEIGHT_CHANGE,
+  MIN_HIGH_DURATION_MS,
+  MAX_HIGH_DURATION_MS,
   DEFAULT_TOLERANCE_WEIGHT,
   MIN_TOLERANCE_WEIGHT,
   DEFAULT_TOLERANCE_DURATION_MS,
   MIN_TOLERANCE_DURATION_MS,
   MAX_TOLERANCE_DURATION_MS,
-  DEFAULT_WEIGHT_READ_INTERVAL_MS,
-  MIN_WEIGHT_READ_INTERVAL_MS,
-  MAX_WEIGHT_READ_INTERVAL_MS,
+  DEFAULT_SENSOR_READ_INTERVAL_MS,
+  MIN_SENSOR_READ_INTERVAL_MS,
+  MAX_SENSOR_READ_INTERVAL_MS,
 } from "@/constants";
-import { Input } from "./ui/input";
 import { Button } from "./ui/button";
+import { FormEvent } from "react";
+import ConfigInputField, { ConfigLabel } from "./ConfigInputField";
 
 export default function ConfigItem(props: {
-  client: MqttClient | null;
+  client: ControlClient | null;
   topicItem: mqttTopicItem;
-  showWeightConfig: boolean;
 }) {
-  const { client, topicItem, showWeightConfig } = props;
+  const { client, topicItem } = props;
+  const [controlMode, setControlMode] = useState<enumControlMode>(
+    enumControlMode.WEIGHT
+  );
+  const [highDurationMs, setHighDurationMs] = useState<number>(
+    DEFAULT_HIGH_DURATION_MS
+  );
+  const [highDurationInput, setHighDurationInput] = useState<string>(
+    (DEFAULT_HIGH_DURATION_MS / 1000).toString()
+  );
   const [targetWeightChange, setTargetWeightChange] = useState<number>(
     DEFAULT_TARGET_WEIGHT_CHANGE
   );
+  const [targetWeightChangeInput, setTargetWeightChangeInput] =
+    useState<string>(DEFAULT_TARGET_WEIGHT_CHANGE.toString());
   const [toleranceWeight, setToleranceWeight] = useState<number>(
     DEFAULT_TOLERANCE_WEIGHT
+  );
+  const [toleranceWeightInput, setToleranceWeightInput] = useState<string>(
+    DEFAULT_TOLERANCE_WEIGHT.toString()
   );
   const [toleranceDurationMs, setToleranceDurationMs] = useState<number>(
     DEFAULT_TOLERANCE_DURATION_MS
@@ -47,61 +64,83 @@ export default function ConfigItem(props: {
   const [toleranceDurationInput, setToleranceDurationInput] = useState<string>(
     (DEFAULT_TOLERANCE_DURATION_MS / 1000).toString()
   );
-  const [weightReadIntervalMs, setWeightReadIntervalMs] = useState<number>(
-    DEFAULT_WEIGHT_READ_INTERVAL_MS
+  const [sensorReadIntervalMs, setSensorReadIntervalMs] = useState<number>(
+    DEFAULT_SENSOR_READ_INTERVAL_MS
   );
   const [heartbeatIntervalDuration, setHeartbeatIntervalDuration] =
-    useState<number>(5); //minutes
+    useState<number>(5);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // const toleranceDurationSeconds = useMemo(
-  //   () => toleranceDurationMs / 1000,
-  //   [toleranceDurationMs]
-  // );
-  const weightReadIntervalSeconds = useMemo(
-    () => weightReadIntervalMs / 1000,
-    [weightReadIntervalMs]
+  const sensorReadIntervalSeconds = useMemo(
+    () => sensorReadIntervalMs / 1000,
+    [sensorReadIntervalMs]
   );
 
   const topicConfig: mqttTopicId = useMemo(
     () => getMqttTopicId(topicItem, enumMqttTopicType.CONFIG),
     [topicItem]
   );
+  const formId = useMemo(() => `valve-config-${topicItem.replace("/", "-")}`, [topicItem]);
 
   useEffect(() => {
     setToleranceDurationInput((toleranceDurationMs / 1000).toString());
   }, [toleranceDurationMs]);
 
-  const onMessageReceived = (_topic: string, payload: MqttMessageAny) => {
+  useEffect(() => {
+    setHighDurationInput((highDurationMs / 1000).toString());
+  }, [highDurationMs]);
+
+  const setFieldError = useCallback((field: string, message?: string) => {
+    setErrors((current) => {
+      if (!message) {
+        if (!(field in current)) return current;
+        const next = { ...current };
+        delete next[field];
+        return next;
+      }
+
+      if (current[field] === message) return current;
+      return {
+        ...current,
+        [field]: message,
+      };
+    });
+  }, []);
+
+  const onMessageReceived = useCallback((_topic: string, payload: MqttMessageAny) => {
     switch (payload.type) {
       case enumMqttTopicType.CONFIG:
-        switch (payload.message.configType) {
-          case "weightControl":
-            if (typeof payload.message.targetWeightChange === "number") {
-              setTargetWeightChange(payload.message.targetWeightChange);
-            }
-            if (typeof payload.message.toleranceWeight === "number") {
-              setToleranceWeight(payload.message.toleranceWeight);
-            }
-            if (typeof payload.message.toleranceDurationMs === "number") {
-              setToleranceDurationMs(payload.message.toleranceDurationMs);
-            }
-            if (typeof payload.message.weightReadIntervalMs === "number") {
-              setWeightReadIntervalMs(payload.message.weightReadIntervalMs);
-            }
-            break;
-          case "heartbeatInterval":
-            setHeartbeatIntervalDuration(
-              payload.message.heartbeatInterval
-            );
-            break;
-          default:
-            break;
+        if (payload.message.controlMode) {
+          setControlMode(payload.message.controlMode);
         }
+        if (typeof payload.message.highDuration === "number") {
+          setHighDurationMs(payload.message.highDuration);
+        }
+        if (typeof payload.message.targetWeightChange === "number") {
+          setTargetWeightChange(payload.message.targetWeightChange);
+          setTargetWeightChangeInput(
+            payload.message.targetWeightChange.toString()
+          );
+        }
+        if (typeof payload.message.toleranceWeight === "number") {
+          setToleranceWeight(payload.message.toleranceWeight);
+          setToleranceWeightInput(payload.message.toleranceWeight.toString());
+        }
+        if (typeof payload.message.toleranceDurationMs === "number") {
+          setToleranceDurationMs(payload.message.toleranceDurationMs);
+        }
+        if (typeof payload.message.sensorReadIntervalMs === "number") {
+          setSensorReadIntervalMs(payload.message.sensorReadIntervalMs);
+        }
+        if (typeof payload.message.heartbeatInterval === "number") {
+          setHeartbeatIntervalDuration(payload.message.heartbeatInterval);
+        }
+        setErrors({});
         break;
       default:
         break;
     }
-  };
+  }, []);
 
   useMqttClient({
     mqttClient: client,
@@ -109,209 +148,281 @@ export default function ConfigItem(props: {
     onMessage: onMessageReceived,
   });
 
-  const onWeightConfigCommit = useCallback(() => {
-    const clampedTarget = Math.max(
-      targetWeightChange,
-      MIN_TARGET_WEIGHT_CHANGE
-    );
-    const clampedTolerance = Math.max(
-      toleranceWeight,
-      MIN_TOLERANCE_WEIGHT
-    );
-    const clampedToleranceDuration = Math.min(
-      Math.max(toleranceDurationMs, MIN_TOLERANCE_DURATION_MS),
-      MAX_TOLERANCE_DURATION_MS
-    );
-    const clampedWeightInterval = Math.min(
-      Math.max(weightReadIntervalMs, MIN_WEIGHT_READ_INTERVAL_MS),
-      MAX_WEIGHT_READ_INTERVAL_MS
+  const publishConfigSnapshot = useCallback(
+    (
+      nextMode: enumControlMode,
+      nextHighDurationMs: number,
+      nextTargetWeightChange: number,
+      nextToleranceWeight: number,
+      nextToleranceDurationMs: number,
+      nextSensorReadIntervalMs: number,
+      nextHeartbeatInterval: number
+    ) => {
+      const message: MqttConfigMessage = {
+        type: enumMqttTopicType.CONFIG,
+        message: {
+          controlMode: nextMode,
+          highDuration: nextHighDurationMs,
+          targetWeightChange: nextTargetWeightChange,
+          toleranceWeight: nextToleranceWeight,
+          toleranceDurationMs: nextToleranceDurationMs,
+          sensorReadIntervalMs: nextSensorReadIntervalMs,
+          heartbeatInterval: nextHeartbeatInterval,
+        },
+        timestamp: new Date().toISOString(),
+      };
+
+      client?.publish(topicConfig, JSON.stringify(message), {
+        retain: true,
+      });
+    },
+    [client, topicConfig]
+  );
+
+  const onValveConfigCommit = useCallback(() => {
+    const nextErrors: Record<string, string> = {};
+
+    const targetWeightParsed = Number(targetWeightChangeInput);
+    if (!Number.isFinite(targetWeightParsed)) {
+      nextErrors.targetWeightChange = "Target weight change must be a valid number.";
+    } else if (targetWeightParsed < MIN_TARGET_WEIGHT_CHANGE) {
+      nextErrors.targetWeightChange = `Target weight change must be at least ${MIN_TARGET_WEIGHT_CHANGE}.`;
+    }
+
+    const toleranceWeightParsed = Number(toleranceWeightInput);
+    if (!Number.isFinite(toleranceWeightParsed)) {
+      nextErrors.toleranceWeight = "Tolerance weight must be a valid number.";
+    } else if (toleranceWeightParsed < MIN_TOLERANCE_WEIGHT) {
+      nextErrors.toleranceWeight = `Tolerance weight must be at least ${MIN_TOLERANCE_WEIGHT}.`;
+    }
+
+    const toleranceDurationSeconds = Number(toleranceDurationInput);
+    if (!Number.isFinite(toleranceDurationSeconds)) {
+      nextErrors.toleranceDurationMs = "Tolerance duration must be a valid number.";
+    } else if (toleranceDurationSeconds < MIN_TOLERANCE_DURATION_MS / 1000) {
+      nextErrors.toleranceDurationMs = `Tolerance duration must be at least ${
+        MIN_TOLERANCE_DURATION_MS / 1000
+      }.`;
+    } else if (toleranceDurationSeconds > MAX_TOLERANCE_DURATION_MS / 1000) {
+      nextErrors.toleranceDurationMs = `Tolerance duration must be at most ${
+        MAX_TOLERANCE_DURATION_MS / 1000
+      }.`;
+    }
+
+    const highDurationSeconds = Number(highDurationInput);
+    if (!Number.isFinite(highDurationSeconds)) {
+      nextErrors.highDurationMs = "Open duration must be a valid number.";
+    } else if (highDurationSeconds < MIN_HIGH_DURATION_MS / 1000) {
+      nextErrors.highDurationMs = `Open duration must be at least ${
+        MIN_HIGH_DURATION_MS / 1000
+      }.`;
+    } else if (highDurationSeconds > MAX_HIGH_DURATION_MS / 1000) {
+      nextErrors.highDurationMs = `Open duration must be at most ${
+        MAX_HIGH_DURATION_MS / 1000
+      }.`;
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors);
+      return;
+    }
+
+    const resolvedHighDuration = highDurationSeconds * 1000;
+    const resolvedTarget = targetWeightParsed;
+    const resolvedTolerance = toleranceWeightParsed;
+    const resolvedToleranceDuration = toleranceDurationSeconds * 1000;
+    const clampedSensorInterval = Math.min(
+      Math.max(sensorReadIntervalMs, MIN_SENSOR_READ_INTERVAL_MS),
+      MAX_SENSOR_READ_INTERVAL_MS
     );
 
-    setTargetWeightChange(clampedTarget);
-    setToleranceWeight(clampedTolerance);
-    setToleranceDurationMs(clampedToleranceDuration);
-    setWeightReadIntervalMs(clampedWeightInterval);
+    setErrors({});
+    setTargetWeightChange(resolvedTarget);
+    setToleranceWeight(resolvedTolerance);
+    setToleranceDurationMs(resolvedToleranceDuration);
+    setSensorReadIntervalMs(clampedSensorInterval);
+    setHighDurationMs(resolvedHighDuration);
 
-    const message: MqttConfigMessage = {
-      type: enumMqttTopicType.CONFIG,
-      message: {
-        configType: "weightControl",
-        targetWeightChange: clampedTarget,
-        toleranceWeight: clampedTolerance,
-        toleranceDurationMs: clampedToleranceDuration,
-        weightReadIntervalMs: clampedWeightInterval,
-      },
-      timestamp: new Date().toISOString(),
-    };
+    publishConfigSnapshot(
+      controlMode,
+      resolvedHighDuration,
+      resolvedTarget,
+      resolvedTolerance,
+      resolvedToleranceDuration,
+      clampedSensorInterval,
+      heartbeatIntervalDuration
+    );
 
-    client?.publish(topicConfig, JSON.stringify(message), {
-      retain: true,
-    });
     toast.success(topicConfig, {
-      description: `Weight control updated (target ${clampedTarget.toFixed(
-        1
-      )}, tolerance ${clampedTolerance.toFixed(1)}, timeout ${(
-        clampedToleranceDuration / 1000
-      ).toFixed(1)}s, interval ${(
-        clampedWeightInterval / 1000
-      ).toFixed(2)}s)`,
+      description:
+        controlMode === enumControlMode.TIME
+          ? `Timer config updated (${(resolvedHighDuration / 1000).toFixed(
+              1
+            )}s duration, ${(clampedSensorInterval / 1000).toFixed(
+              1
+            )}s sensor interval)`
+          : `Weight config updated (target ${resolvedTarget.toFixed(
+              1
+            )}g, tolerance ${resolvedTolerance.toFixed(1)}g, timeout ${(
+              resolvedToleranceDuration / 1000
+            ).toFixed(1)}s, ${(clampedSensorInterval / 1000).toFixed(
+              1
+            )}s sensor interval)`,
     });
   }, [
-    client,
-    targetWeightChange,
-    toleranceWeight,
-    toleranceDurationMs,
-    weightReadIntervalMs,
+    controlMode,
+    heartbeatIntervalDuration,
+    highDurationInput,
+    publishConfigSnapshot,
+    sensorReadIntervalMs,
+    targetWeightChangeInput,
+    toleranceDurationInput,
+    toleranceWeightInput,
     topicConfig,
   ]);
 
-  const onHeartbeatIntervalCommit = useCallback(() => {
-    const message: MqttConfigMessage = {
-      type: enumMqttTopicType.CONFIG,
-      message: {
-        configType: "heartbeatInterval",
-        heartbeatInterval: heartbeatIntervalDuration,
-      },
-      timestamp: new Date().toISOString(),
-    };
-    console.log("message to publish: ", topicConfig, message);
-    client?.publish(topicConfig, JSON.stringify(message), {
-      retain: true,
-    });
-    toast.success(topicConfig, {
-      description: `Heartbeat interval updated to ${heartbeatIntervalDuration} minutes`,
-    });
-  }, [client, heartbeatIntervalDuration, topicConfig]);
+  const onSubmit = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      onValveConfigCommit();
+    },
+    [onValveConfigCommit]
+  );
 
   return (
-    <div className="flex flex-col items-start justify-center gap-3">
-      <div
-        className={`flex flex-col items-start justify-center gap-2 w-full ${
-          showWeightConfig ? "" : "hidden"
-        }`}
-      >
-        <Label className="font-semibold" htmlFor={topicItem}>
-          Weight Control
-        </Label>
-        <div className="grid w-full grid-cols-1 gap-3">
-          <div className="flex flex-col gap-1">
-            <Label htmlFor={`${topicItem}-target-weight`}>
-              Target weight change
-            </Label>
-            <Input
+    <form id={formId} onSubmit={onSubmit} className="flex flex-col gap-4">
+      <div className="space-y-4">
+        <div className="flex flex-col items-start justify-center gap-2 w-full">
+          <ConfigLabel
+            htmlFor={`${topicItem}-sensor-interval`}
+            label="Sensor reading interval"
+            tooltip="How often the controller sends open-state status updates while the valve is active."
+          />
+          <div className="flex gap-2 w-full">
+            <Slider
+              onValueChange={([value]) => {
+                setFieldError("sensorReadIntervalMs");
+                setSensorReadIntervalMs(value * 1000);
+              }}
+              value={[sensorReadIntervalSeconds]}
+              min={MIN_SENSOR_READ_INTERVAL_MS / 1000}
+              max={MAX_SENSOR_READ_INTERVAL_MS / 1000}
+              step={0.1}
+              name={`${topicItem}-sensor-interval`}
+              className="flex-3"
+            />
+            <p className="text-left flex-1">{sensorReadIntervalSeconds.toFixed(1)} s</p>
+          </div>
+          {errors.sensorReadIntervalMs ? (
+            <p className="text-xs text-destructive">{errors.sensorReadIntervalMs}</p>
+          ) : null}
+        </div>
+
+        <div className="flex flex-col items-start justify-center gap-2 w-full">
+          <ConfigLabel
+            htmlFor={topicItem}
+            label="Heartbeat interval"
+            tooltip="How often the controller publishes heartbeat updates regardless of whether the valve is open or closed."
+          />
+          <div className="flex gap-2 w-full">
+            <Slider
+              onValueChange={([value]) => setHeartbeatIntervalDuration(value)}
+              value={[heartbeatIntervalDuration]}
+              defaultValue={[heartbeatIntervalDuration]}
+              min={HEARTBEAT_INTERVAL_MIN}
+              max={HEARTBEAT_INTERVAL_MAX}
+              step={0.1}
+              name={topicItem}
+              className="flex-3"
+            />
+            <p className="text-left flex-1">
+              {heartbeatIntervalDuration.toFixed(1)} min
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-col items-start justify-center gap-2 w-full">
+          <ConfigLabel
+            label="Valve control mode"
+            tooltip="Choose whether this valve stops based on target weight change or a fixed open duration."
+          />
+          <div className="flex w-full gap-2">
+            <Button
+              type="button"
+              variant={controlMode === enumControlMode.WEIGHT ? "default" : "outline"}
+              className="flex-1"
+              onClick={() => setControlMode(enumControlMode.WEIGHT)}
+            >
+              Weight
+            </Button>
+            <Button
+              type="button"
+              variant={controlMode === enumControlMode.TIME ? "default" : "outline"}
+              className="flex-1"
+              onClick={() => setControlMode(enumControlMode.TIME)}
+            >
+              Time
+            </Button>
+          </div>
+        </div>
+
+        {controlMode === enumControlMode.WEIGHT ? (
+          <div className="flex flex-col gap-3 w-full pb-3">
+            <ConfigInputField
               id={`${topicItem}-target-weight`}
+              label="Target weight change"
+              tooltip="Target increase in measured weight before the valve closes automatically."
               type="number"
               min={MIN_TARGET_WEIGHT_CHANGE}
               step={0.1}
-              value={targetWeightChange}
-              onChange={(event) => {
-                const next = event.target.valueAsNumber;
-                if (!Number.isNaN(next)) {
-                  setTargetWeightChange(next);
-                }
-              }}
+              value={targetWeightChangeInput}
+              onChange={(event) => setTargetWeightChangeInput(event.target.value)}
+              error={errors.targetWeightChange}
             />
-            <p className="text-xs text-muted-foreground">
-              Weight loss required before closing the valve.
-            </p>
-          </div>
-          <div className="flex flex-col gap-1">
-            <Label htmlFor={`${topicItem}-tolerance-weight`}>
-              Tolerance weight
-            </Label>
-            <Input
+
+            <ConfigInputField
               id={`${topicItem}-tolerance-weight`}
+              label="Tolerance weight"
+              tooltip="Minimum weight change expected within the tolerance duration while the valve is open."
               type="number"
               min={MIN_TOLERANCE_WEIGHT}
               step={0.1}
-              value={toleranceWeight}
-              onChange={(event) => {
-                const next = event.target.valueAsNumber;
-                if (!Number.isNaN(next)) {
-                  setToleranceWeight(next);
-                }
-              }}
+              value={toleranceWeightInput}
+              onChange={(event) => setToleranceWeightInput(event.target.value)}
+              error={errors.toleranceWeight}
             />
-            <p className="text-xs text-muted-foreground">
-              Minimum weight loss expected within the tolerance window.
-            </p>
-          </div>
-          <div className="flex flex-col gap-1">
-            <Label htmlFor={`${topicItem}-tolerance-duration`}>
-              Tolerance duration (seconds)
-            </Label>
-            <Input
+
+            <ConfigInputField
               id={`${topicItem}-tolerance-duration`}
+              label="Tolerance duration (seconds)"
+              tooltip="How long to wait for enough weight change before timing out and closing the valve."
               type="number"
               min={MIN_TOLERANCE_DURATION_MS / 1000}
               max={MAX_TOLERANCE_DURATION_MS / 1000}
               step={0.5}
               value={toleranceDurationInput}
-              onChange={(event) => {
-                setToleranceDurationInput(event.target.value);
-              }}
-              onBlur={() => {
-                const next = parseFloat(toleranceDurationInput);
-                const clampedSeconds = Number.isFinite(next)
-                  ? Math.min(
-                      Math.max(next, MIN_TOLERANCE_DURATION_MS / 1000),
-                      MAX_TOLERANCE_DURATION_MS / 1000
-                    )
-                  : MIN_TOLERANCE_DURATION_MS / 1000;
-                setToleranceDurationMs(clampedSeconds * 1000);
-                setToleranceDurationInput(clampedSeconds.toString());
-              }}
+              onChange={(event) => setToleranceDurationInput(event.target.value)}
+              error={errors.toleranceDurationMs}
             />
-            <p className="text-xs text-muted-foreground">
-              Time allowed for the tolerance weight decrease after opening.
-            </p>
           </div>
-          <div className="flex flex-col gap-1">
-            <Label htmlFor={`${topicItem}-weight-interval`}>
-              Sensor read interval (seconds)
-            </Label>
-            <Input
-              id={`${topicItem}-weight-interval`}
+        ) : (
+          <div className="w-full pb-3">
+            <ConfigInputField
+              id={`${topicItem}-duration`}
+              label="Open duration (seconds)"
+              tooltip="How long the valve stays open before it closes automatically in time mode."
               type="number"
-              min={MIN_WEIGHT_READ_INTERVAL_MS / 1000}
-              max={MAX_WEIGHT_READ_INTERVAL_MS / 1000}
-              step={0.1}
-              value={weightReadIntervalSeconds}
-              onChange={(event) => {
-                const next = event.target.valueAsNumber;
-                if (!Number.isNaN(next)) {
-                  setWeightReadIntervalMs(next * 1000);
-                }
-              }}
+              min={MIN_HIGH_DURATION_MS / 1000}
+              max={MAX_HIGH_DURATION_MS / 1000}
+              step={0.5}
+              value={highDurationInput}
+              onChange={(event) => setHighDurationInput(event.target.value)}
+              error={errors.highDurationMs}
             />
-            <p className="text-xs text-muted-foreground">
-              How frequently to sample the weight sensor while active.
-            </p>
           </div>
-        </div>
-        <Button onClick={onWeightConfigCommit} className="self-end">
-          Save weight config
-        </Button>
+        )}
       </div>
-      <div className="flex flex-col items-start justify-center gap-2 w-full">
-        <Label htmlFor={topicItem}>Heartbeat Interval</Label>
-        <div className="flex gap-2 w-full">
-          <Slider
-            onValueChange={([value]) => setHeartbeatIntervalDuration(value)}
-            onValueCommit={() => onHeartbeatIntervalCommit()}
-            value={[heartbeatIntervalDuration]}
-            defaultValue={[heartbeatIntervalDuration]}
-            min={HEARTBEAT_INTERVAL_MIN}
-            max={HEARTBEAT_INTERVAL_MAX}
-            step={0.1}
-            name={topicItem}
-            className="flex-3"
-          />
-          <p className="text-left flex-1">
-            {heartbeatIntervalDuration.toFixed(1)} min
-          </p>
-        </div>
-      </div>
-    </div>
+
+    </form>
   );
 }

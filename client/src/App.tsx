@@ -3,6 +3,7 @@ import Login from "./pages/Login";
 import Menu from "./pages/Menu";
 import IrrigationControl from "./pages/IrrigationControl";
 import AirconControl from "./pages/AirconControl";
+import TemperatureHumiditySensors from "./pages/TemperatureHumiditySensors";
 import ProtectedRoute from "./pages/ProtectedRoute";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "sonner";
@@ -27,6 +28,7 @@ function App() {
           <Route path="/menu" element={<ProtectedRoute><Menu /></ProtectedRoute>} />
           <Route path="/irrigation" element={<ProtectedRoute><IrrigationControl /></ProtectedRoute>} />
           <Route path="/aircon" element={<ProtectedRoute><AirconControl /></ProtectedRoute>} />
+          <Route path="/sensors" element={<ProtectedRoute><TemperatureHumiditySensors /></ProtectedRoute>} />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ChevronRight, LoaderCircle } from "lucide-react";
 import Logo from "@/components/Logo";
 import { toast } from "sonner";
+import { USE_MOCK_IRRIGATION_DATA } from "@/constants";
 
 export default function Login() {
   const [token, setToken] = useState("");
@@ -14,6 +15,11 @@ export default function Login() {
 
   const handleLogin = async () => {
     setIsLoading(true);
+    if (USE_MOCK_IRRIGATION_DATA) {
+      navigate("/menu");
+      setIsLoading(false);
+      return;
+    }
     try {
       await axios.post(
         `${import.meta.env.VITE_BACKEND_URL}/auth/login`,

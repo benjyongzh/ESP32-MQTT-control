@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import mqtt, { MqttClient } from "mqtt";
 import Logo from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { LoaderCircle } from "lucide-react";
 import ControlLayout from "@/components/ControlLayout";
 import { useMqttClient } from "@/components/hooks/useMqttClient";
+import { ControlClient, createControlClient } from "@/lib/control-client";
 import {
   enumClientStatus,
   enumMqttTopicType,
@@ -13,15 +13,11 @@ import {
 import { AIRCON_MQTT_TOPIC } from "../constants";
 
 export default function AirconControl() {
-  const [client, setClient] = useState<MqttClient | null>(null);
+  const [client, setClient] = useState<ControlClient | null>(null);
   const { clientStatus } = useMqttClient({ mqttClient: client });
 
   useEffect(() => {
-    const mqttClient = mqtt.connect(import.meta.env.VITE_MQTT_CLUSTER_URL, {
-      username: import.meta.env.VITE_MQTT_USERNAME,
-      password: import.meta.env.VITE_MQTT_PASSWORD,
-    });
-    setClient(mqttClient);
+    setClient(createControlClient());
   }, []);
 
   const sendCommand = (cmd: string) => {

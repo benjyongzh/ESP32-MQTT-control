@@ -1,13 +1,13 @@
-import { useEffect, useState } from "react";
-import { MqttClient } from "mqtt";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   enumClientStatus,
   enumMqttTopicType,
   MqttMessageAny,
 } from "@/types";
+import { ControlClient } from "@/lib/control-client";
 
 interface UseMQTTListenerProps {
-  mqttClient: MqttClient | null;
+  mqttClient: ControlClient | null;
   topics?: string[];
   onMessage?: (topic: string, payload: MqttMessageAny) => void;
 }
@@ -20,6 +20,18 @@ export const useMqttClient = ({
   const [clientStatus, setClientStatus] = useState<enumClientStatus>(
     enumClientStatus.ERROR
   );
+  const topicsRef = useRef<string[]>(topics ?? []);
+  const onMessageRef = useRef<typeof onMessage>(onMessage);
+
+  useEffect(() => {
+    topicsRef.current = topics ?? [];
+  }, [topics]);
+
+  useEffect(() => {
+    onMessageRef.current = onMessage;
+  }, [onMessage]);
+
+  const topicKey = useMemo(() => (topics ?? []).join("|"), [topics]);
 
   const inferTopicType = (topic: string): enumMqttTopicType | undefined => {
     const parts = topic.split("/");
@@ -35,9 +47,10 @@ export const useMqttClient = ({
     }
   };
 
-  const refreshTopics = () => {
-    if (!mqttClient || !topics?.length) return;
-    topics.forEach((topic) => {
+  const refreshTopics = useCallback(() => {
+    const currentTopics = topicsRef.current;
+    if (!mqttClient || currentTopics.length === 0) return;
+    currentTopics.forEach((topic) => {
       mqttClient.subscribe(topic, { qos: 1 }, (err) => {
         if (err) {
           console.error(`Refresh subscribe error for topic ${topic}:`, err);
@@ -46,28 +59,31 @@ export const useMqttClient = ({
         }
       });
     });
+  }, [mqttClient]);
+
+  const parsePayload = (payload: unknown): MqttMessageAny | null => {
+    if (typeof payload === "string") {
+      return JSON.parse(payload) as MqttMessageAny;
+    }
+
+    if (
+      payload &&
+      typeof payload === "object" &&
+      "toString" in payload &&
+      typeof payload.toString === "function"
+    ) {
+      return JSON.parse(payload.toString()) as MqttMessageAny;
+    }
+
+    return null;
   };
 
   useEffect(() => {
     if (!mqttClient) return;
 
-    const handleConnect = () => {
-      setClientStatus(enumClientStatus.CONNECTED);
-      onClientConnect();
-    };
-
-    const handleReconnect = () => {
-      setClientStatus(enumClientStatus.RECONNECTED);
-      onClientConnect();
-    };
-
-    const handleClose = () => {
-      setClientStatus(enumClientStatus.CLOSED);
-    };
-
-    const onClientConnect = () => {
-      // Subscribe to topics
-      topics?.forEach((topic) => {
+    const subscribeToTopics = () => {
+      const currentTopics = topicsRef.current;
+      currentTopics.forEach((topic) => {
         mqttClient.subscribe(topic, { qos: 1 }, (err) => {
           if (err) {
             console.error(`Subscription error for topic ${topic}:`, err);
@@ -78,9 +94,30 @@ export const useMqttClient = ({
       });
     };
 
-    const handleMessage = (topic: string, payload: Buffer<ArrayBufferLike>) => {
-      if (topics?.includes(topic) && onMessage) {
-        const parsed = JSON.parse(payload.toString()) as MqttMessageAny;
+    const handleConnect = () => {
+      setClientStatus(enumClientStatus.CONNECTED);
+      subscribeToTopics();
+    };
+
+    const handleReconnect = () => {
+      setClientStatus(enumClientStatus.RECONNECTED);
+      subscribeToTopics();
+    };
+
+    const handleClose = () => {
+      setClientStatus(enumClientStatus.CLOSED);
+    };
+
+    const handleMessage = (topic: string, payload: unknown) => {
+      const currentTopics = topicsRef.current;
+      const currentOnMessage = onMessageRef.current;
+
+      if (currentTopics.includes(topic) && currentOnMessage) {
+        const parsed = parsePayload(payload);
+        if (!parsed) {
+          console.warn("Unable to parse MQTT payload");
+          return;
+        }
         const resolvedType =
           (parsed.type as enumMqttTopicType | undefined) ?? inferTopicType(topic);
 
@@ -100,7 +137,7 @@ export const useMqttClient = ({
           case enumMqttTopicType.CONFIG:
           case enumMqttTopicType.HEALTH:
           case enumMqttTopicType.CONTROL:
-            onMessage(topic, typedPayload);
+            currentOnMessage(topic, typedPayload);
             break;
           default:
             console.warn("Unhandled MQTT message type");
@@ -124,7 +161,7 @@ export const useMqttClient = ({
       mqttClient.removeListener("close", handleClose);
       mqttClient.removeListener("message", handleMessage);
     };
-  }, [mqttClient, topics, onMessage]);
+  }, [mqttClient, topicKey]);
 
   return { clientStatus, refreshTopics };
 };

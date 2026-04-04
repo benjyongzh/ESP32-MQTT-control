@@ -40,7 +40,17 @@ export const dateFormatter = new Intl.DateTimeFormat("en-SG", {
 export const formatTopicFromTopicString = (
   topicString: mqttTopicItem
 ): string => {
+  return formatTopicFromTopicStringWithMap(
+    topicString,
+    CONTROLLER_DEVICE_ID_TO_TOPIC
+  );
+};
+
+export const formatTopicFromTopicStringWithMap = (
+  topicString: mqttTopicItem,
+  deviceIdToTopic: Record<string, topicList>
+): string => {
   const [deviceId, index] = topicString.split("/");
-  const list: topicList = CONTROLLER_DEVICE_ID_TO_TOPIC[deviceId];
+  const list: topicList = deviceIdToTopic[deviceId];
   return `${list.topic}/${index}`;
 };

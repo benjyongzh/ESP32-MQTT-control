@@ -10,6 +10,9 @@ export default function Menu() {
       <div className="flex flex-col gap-4 mt-8">
         <Button onClick={() => navigate("/irrigation")}>Irrigation Control</Button>
         <Button onClick={() => navigate("/aircon")}>Aircon Control</Button>
+        <Button onClick={() => navigate("/sensors")}>
+          Temperature/Humidity Sensors
+        </Button>
       </div>
     </div>
   );

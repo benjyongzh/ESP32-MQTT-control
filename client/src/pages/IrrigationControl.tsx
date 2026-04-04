@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import mqtt, { MqttClient } from "mqtt";
 import ControlItem from "../components/ControlItem";
 import Logo from "@/components/Logo";
 import { CONTROLLER_DEVICE_ID_TO_TOPIC } from "../constants";
 import { mqttTopicItem, enumClientStatus } from "../types";
 import { getArrayOfTopicItems } from "../utils";
-import { LoaderCircle, Bolt } from "lucide-react";
+import { LoaderCircle, Bolt, Check } from "lucide-react";
 import ControlLayout from "@/components/ControlLayout";
 import { useMqttClient } from "@/components/hooks/useMqttClient";
+import { ControlClient, createControlClient } from "@/lib/control-client";
 import {
   Dialog,
   DialogContent,
@@ -19,22 +19,17 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 
 export default function IrrigationControl() {
-  const [client, setClient] = useState<MqttClient | null>(null);
+  const [client, setClient] = useState<ControlClient | null>(null);
   const { clientStatus } = useMqttClient({ mqttClient: client });
-  const [showWeightConfig, setShowWeightConfig] = useState<boolean>(true);
+  const [showConfigControls, setShowConfigControls] = useState<boolean>(true);
 
   useEffect(() => {
-    const mqttClient = mqtt.connect(import.meta.env.VITE_MQTT_CLUSTER_URL, {
-      username: import.meta.env.VITE_MQTT_USERNAME,
-      password: import.meta.env.VITE_MQTT_PASSWORD,
-    });
-
-    setClient(mqttClient);
+    setClient(createControlClient());
   }, []);
 
   const topicItems: mqttTopicItem[] = useMemo(
     () => getArrayOfTopicItems(CONTROLLER_DEVICE_ID_TO_TOPIC),
-    [CONTROLLER_DEVICE_ID_TO_TOPIC]
+    []
   );
 
   const configDialog = (
@@ -46,16 +41,21 @@ export default function IrrigationControl() {
       </DialogTrigger>
       <DialogContent className="max-w-xs md:max-w-sm">
         <DialogHeader>
-          <DialogTitle className="text-left">Main Config</DialogTitle>
+          <DialogTitle className="text-left">Display Options</DialogTitle>
         </DialogHeader>
         <div className="flex flex-col items-stretch justify-between gap-6 mt-4">
-          <div className="flex justify-between items-center">
-            <p>Show weight control config</p>
-            <div className="flex items-center justify-center text-center">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col gap-1">
+              <p>Show valve configuration controls</p>
+              <p className="text-sm text-muted-foreground">
+                Hide config editing to reduce the chance of accidental valve changes.
+              </p>
+            </div>
+            <div className="flex h-5 items-center justify-center shrink-0">
               <Switch
-                checked={showWeightConfig}
+                checked={showConfigControls}
                 onCheckedChange={(checked: boolean) =>
-                  setShowWeightConfig(checked)
+                  setShowConfigControls(checked)
                 }
               />
             </div>
@@ -74,7 +74,7 @@ export default function IrrigationControl() {
       <div className="mb-4 w-full max-w-xl flex justify-center items-center gap-2">
         {clientStatus === enumClientStatus.CONNECTED ||
         clientStatus === enumClientStatus.RECONNECTED ? (
-          "✅"
+          <Check className="text-foreground" />
         ) : (
           <LoaderCircle className="animate-spin text-foreground" />
         )}
@@ -97,7 +97,7 @@ export default function IrrigationControl() {
               client={client}
               topicItem={topic}
               key={topic}
-              showWeightConfig={showWeightConfig}
+              showConfigControls={showConfigControls}
             />
           ))}
         </div>

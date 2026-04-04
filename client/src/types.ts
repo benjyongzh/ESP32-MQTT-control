@@ -21,6 +21,11 @@ export enum enumMqttTopicType {
   HEALTH = "controllerhealth",
 }
 
+export enum enumControlMode {
+  WEIGHT = "weight",
+  TIME = "time",
+}
+
 export const getMqttTopicId = (
   topic: mqttTopicItem,
   type: enumMqttTopicType
@@ -43,10 +48,21 @@ export interface ValveStatusPayload {
   state: ValveState;
   weight: number;
   weightChange: number;
+  progressValue?: number;
+  targetValue?: number;
+  progressUnit?: string;
+  controlMode?: enumControlMode;
   reason?: string;
 }
 
-export interface MqttStatusMessage extends MqttMessage<ValveStatusPayload> {
+export interface SensorStatusPayload {
+  temperature: number;
+  humidity: number;
+  readingIntervalSeconds?: number;
+}
+
+export interface MqttStatusMessage
+  extends MqttMessage<ValveStatusPayload | SensorStatusPayload> {
   type: enumMqttTopicType.STATUS;
 }
 
@@ -58,6 +74,12 @@ export interface ValveHealthPayload {
   ipAddress: string;
   active: boolean;
   weight: number;
+}
+
+export interface SensorHealthPayload {
+  ipAddress: string;
+  online: boolean;
+  lastReadingAt?: string;
 }
 
 export interface MqttHealthMessage extends MqttMessage<mqttHealthMessage> {
@@ -74,24 +96,23 @@ export type MqttMessageAny =
   | MqttHealthMessage
   | MqttControlMessage;
 
-export interface HeartbeatIntervalConfig {
-  configType: "heartbeatInterval";
-  heartbeatInterval: number;
-}
-
-export interface WeightControlConfig {
-  configType: "weightControl";
+export interface ValveControlConfig {
+  controlMode?: enumControlMode;
+  heartbeatInterval?: number;
+  highDuration?: number;
   targetWeightChange?: number;
   toleranceWeight?: number;
   toleranceDurationMs?: number;
-  weightReadIntervalMs?: number;
+  sensorReadIntervalMs?: number;
 }
 
-export type mqttConfigMessage =
-  | HeartbeatIntervalConfig
-  | WeightControlConfig;
+export interface SensorReaderConfig {
+  readingIntervalSeconds?: number;
+}
 
-export type mqttHealthMessage = ValveHealthPayload;
+export type mqttConfigMessage = ValveControlConfig & SensorReaderConfig;
+
+export type mqttHealthMessage = ValveHealthPayload | SensorHealthPayload;
 
 export type topicList = {
   topic: string;
