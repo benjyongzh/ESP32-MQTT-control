@@ -241,8 +241,14 @@ String getCurrentTimestamp() {
 bool publishCommand(const char* topic, JsonDocument& doc, bool retain = true) {
   doc["timestamp"] = getCurrentTimestamp();
 
-  char payload[256];
-  serializeJson(doc, payload);
+  char payload[384];
+  size_t payloadLength = serializeJson(doc, payload, sizeof(payload));
+  if (payloadLength == 0 || payloadLength >= sizeof(payload) - 1) {
+    Serial.print("Message too large to serialize safely [");
+    Serial.print(topic);
+    Serial.println("]");
+    return false;
+  }
 
   bool published = client.publish(topic, payload, retain);
   if (published) {
@@ -253,7 +259,8 @@ bool publishCommand(const char* topic, JsonDocument& doc, bool retain = true) {
   } else {
     Serial.print("Message failed to publish ❌ [");
     Serial.print(topic);
-    Serial.println("]");
+    Serial.print("] payloadLength=");
+    Serial.println(payloadLength);
   }
   return published;
 }
@@ -681,6 +688,7 @@ void setup() {
   wifiClient.setInsecure();  // For testing with self-signed cert
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(callback);
+  client.setBufferSize(512);
 }
 
 void loop() {
