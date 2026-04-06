@@ -179,6 +179,11 @@ class MockControlClient implements ControlClient {
   ) {
     try {
       const parsed = JSON.parse(message) as MqttMessageAny;
+      if (this.isConfigRequestTopic(topic)) {
+        this.handleConfigRequest(topic);
+        callback?.();
+        return;
+      }
       const topicType = this.getTopicType(topic);
 
       if (topicType === enumMqttTopicType.CONTROL) {
@@ -310,6 +315,12 @@ class MockControlClient implements ControlClient {
 
     this.publishConfig(topicItem);
     this.publishHealth(topicItem);
+  }
+
+  private handleConfigRequest(topic: string) {
+    const topicItem = this.getTopicItem(topic);
+    if (!topicItem) return;
+    this.publishConfig(topicItem);
   }
 
   private activateValve(topicItem: string, valve: MockValveState) {
@@ -599,6 +610,10 @@ class MockControlClient implements ControlClient {
   private getTopicType(topic: string) {
     const parts = topic.split("/");
     return parts[parts.length - 1] as enumMqttTopicType;
+  }
+
+  private isConfigRequestTopic(topic: string) {
+    return topic.endsWith(`/${enumMqttTopicType.CONFIG}/get`);
   }
 
   private getMockIpAddress(topicItem: string) {

@@ -88,6 +88,10 @@ export default function ConfigItem(props: {
     () => getMqttTopicId(topicItem, enumMqttTopicType.CONFIG),
     [topicItem]
   );
+  const topicConfigRequest = useMemo(
+    () => `${topicConfig}/get`,
+    [topicConfig]
+  );
   const formId = useMemo(() => `valve-config-${topicItem.replace("/", "-")}`, [topicItem]);
 
   useEffect(() => {
@@ -172,19 +176,31 @@ export default function ConfigItem(props: {
     setErrors({});
     onConfigStateChange("loading");
     refreshTopics();
+    client?.publish(
+      topicConfigRequest,
+      JSON.stringify({
+        type: enumMqttTopicType.CONFIG,
+        message: { request: "get" },
+        timestamp: new Date().toISOString(),
+      }),
+      { retain: false }
+    );
 
     const timeoutId = window.setTimeout(() => {
       setHasReceivedConfig((current) => {
         if (!current) {
           setConfigLoadState("missing");
           onConfigStateChange("missing");
+          toast.error("No existing config detected", {
+            description: `No retained MQTT config was found for ${topicItem}. Default values are available to save.`,
+          });
         }
         return current;
       });
     }, 1500);
 
     return () => window.clearTimeout(timeoutId);
-  }, [isOpen, onConfigStateChange, refreshTopics]);
+  }, [client, isOpen, onConfigStateChange, refreshTopics, topicConfigRequest, topicItem]);
 
   const publishConfigSnapshot = useCallback(
     (
@@ -343,11 +359,6 @@ export default function ConfigItem(props: {
   return (
     <form id={formId} onSubmit={onSubmit} className="flex flex-col gap-4">
       <div className="space-y-4">
-        {configLoadState === "missing" ? (
-          <div className="rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-            No existing config detected for this valve. Default values are shown below.
-          </div>
-        ) : null}
         <div className="flex flex-col items-start justify-center gap-2 w-full">
           <ConfigLabel
             htmlFor={`${topicItem}-sensor-interval`}

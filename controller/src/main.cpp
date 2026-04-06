@@ -33,6 +33,7 @@ const char* topic_type_status = "status";
 const char* topic_type_control = "control";
 // MQTT topic to subscribe to
 const char* topic_type_config = "config";
+const char* topic_type_config_request = "config/get";
 // MQTT topic to publish to
 const char* topic_type_health = "controllerhealth";
 
@@ -106,6 +107,10 @@ bool mqtt_disconnection_blinker_on = false;
 
 WiFiClientSecure wifiClient;
 PubSubClient client(wifiClient);
+
+int topicIdToIndex(int topicId);
+const char* controlModeToString(ControlMode mode);
+void publishValveConfig(int valveIdInTopic);
 
 // Time config (UTC+8 for example)
 #define GMT_OFFSET_SEC 0//8 * 3600
@@ -203,6 +208,7 @@ void connectMQTT() {
   Serial.println("✅ MQTT connected!");
   mqttSubscribe(topic_type_control);
   mqttSubscribe(topic_type_config);
+  mqttSubscribe(topic_type_config_request);
   digitalWrite(mqtt_connection_status_pin, HIGH);
 }
 
@@ -256,6 +262,31 @@ void publishCommand(const char* topic, const char* cmd, bool retain = true) {
   JsonDocument doc;
   doc["message"] = cmd;
   publishCommand(topic, doc, retain);
+}
+
+void publishValveConfig(int valveIdInTopic) {
+  int index = topicIdToIndex(valveIdInTopic);
+  if (index < 0) {
+    return;
+  }
+
+  ValveConfig &valve = valves[index];
+  char topic[64];
+  snprintf(topic, sizeof(topic), "%s/%i/%s", deviceId, valveIdInTopic,
+           topic_type_config);
+
+  JsonDocument doc;
+  doc["type"] = topic_type_config;
+  JsonObject message = doc["message"].to<JsonObject>();
+  message["controlMode"] = controlModeToString(valve.controlMode);
+  message["highDuration"] = valve.highDurationMs;
+  message["targetWeightChange"] = valve.targetWeightChange;
+  message["toleranceWeight"] = valve.toleranceWeight;
+  message["toleranceDurationMs"] = valve.toleranceDurationMs;
+  message["sensorReadIntervalMs"] = valve.sensorReadIntervalMs;
+  message["heartbeatInterval"] = healthInterval;
+
+  publishCommand(topic, doc, true);
 }
 
 int topicIdToIndex(int topicId) {
@@ -451,6 +482,21 @@ char* getMessageTypeFromTopic(char* topic){
   return token;
 }
 
+char* getTopicActionFromTopic(char* topic){
+  static char buffer[64];
+  strncpy(buffer, topic, sizeof(buffer));
+  buffer[sizeof(buffer) - 1] = '\0';
+
+  char* token;
+  char* saveptr;
+
+  token = strtok_r(buffer, "/", &saveptr);  // skip clientId
+  token = strtok_r(nullptr, "/", &saveptr); // skip pin
+  token = strtok_r(nullptr, "/", &saveptr); // skip messageType
+  token = strtok_r(nullptr, "/", &saveptr); // action
+  return token;
+}
+
 void callback(char* topic, byte* payload, unsigned int length) {
   Serial.print("Message RECEIVED [");
   Serial.print(topic);
@@ -476,6 +522,14 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
   int topic_id = getIdFromTopic(topic);
   char* topic_type = getMessageTypeFromTopic(topic);
+  char* topic_action = getTopicActionFromTopic(topic);
+
+  if (String(topic_type) == String(topic_type_config) &&
+      topic_action != nullptr &&
+      String(topic_action) == "get") {
+    publishValveConfig(topic_id);
+    return;
+  }
 
   if (String(topic_type) == String(topic_type_control)) {
     const char* messageTimestamp = doc["timestamp"];
