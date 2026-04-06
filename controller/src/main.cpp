@@ -87,13 +87,14 @@ struct ValveConfig {
 };
 
 ValveConfig valves[MAX_VALVES] = {
-  {32, false, 0, 0, 0, 0.0f, 0.0f, CONTROL_MODE_WEIGHT, DEFAULT_HIGH_DURATION_MS, DEFAULT_TARGET_WEIGHT_CHANGE, DEFAULT_TOLERANCE_WEIGHT, DEFAULT_TOLERANCE_DURATION_MS, DEFAULT_SENSOR_READ_INTERVAL_MS, false},
-  {15, false, 0, 0, 0, 0.0f, 0.0f, CONTROL_MODE_WEIGHT, DEFAULT_HIGH_DURATION_MS, DEFAULT_TARGET_WEIGHT_CHANGE, DEFAULT_TOLERANCE_WEIGHT, DEFAULT_TOLERANCE_DURATION_MS, DEFAULT_SENSOR_READ_INTERVAL_MS, false},
-  {17, false, 0, 0, 0, 0.0f, 0.0f, CONTROL_MODE_WEIGHT, DEFAULT_HIGH_DURATION_MS, DEFAULT_TARGET_WEIGHT_CHANGE, DEFAULT_TOLERANCE_WEIGHT, DEFAULT_TOLERANCE_DURATION_MS, DEFAULT_SENSOR_READ_INTERVAL_MS, false},
-  {18, false, 0, 0, 0, 0.0f, 0.0f, CONTROL_MODE_WEIGHT, DEFAULT_HIGH_DURATION_MS, DEFAULT_TARGET_WEIGHT_CHANGE, DEFAULT_TOLERANCE_WEIGHT, DEFAULT_TOLERANCE_DURATION_MS, DEFAULT_SENSOR_READ_INTERVAL_MS, false}
+  {32, false, 0, 0, 0, 0.0f, 0.0f, CONTROL_MODE_TIME, DEFAULT_HIGH_DURATION_MS, DEFAULT_TARGET_WEIGHT_CHANGE, DEFAULT_TOLERANCE_WEIGHT, DEFAULT_TOLERANCE_DURATION_MS, DEFAULT_SENSOR_READ_INTERVAL_MS, false},
+  {15, false, 0, 0, 0, 0.0f, 0.0f, CONTROL_MODE_TIME, DEFAULT_HIGH_DURATION_MS, DEFAULT_TARGET_WEIGHT_CHANGE, DEFAULT_TOLERANCE_WEIGHT, DEFAULT_TOLERANCE_DURATION_MS, DEFAULT_SENSOR_READ_INTERVAL_MS, false},
+  {19, false, 0, 0, 0, 0.0f, 0.0f, CONTROL_MODE_TIME, DEFAULT_HIGH_DURATION_MS, DEFAULT_TARGET_WEIGHT_CHANGE, DEFAULT_TOLERANCE_WEIGHT, DEFAULT_TOLERANCE_DURATION_MS, DEFAULT_SENSOR_READ_INTERVAL_MS, false},
+  {18, false, 0, 0, 0, 0.0f, 0.0f, CONTROL_MODE_TIME, DEFAULT_HIGH_DURATION_MS, DEFAULT_TARGET_WEIGHT_CHANGE, DEFAULT_TOLERANCE_WEIGHT, DEFAULT_TOLERANCE_DURATION_MS, DEFAULT_SENSOR_READ_INTERVAL_MS, false}
 };
 
 float lastWeightReading = 0.0f;
+bool weightSensorInitialized = false;
 
 // wifi connection status pin
 const int wifi_connection_status_pin = 27;  //15/27
@@ -278,6 +279,12 @@ ControlMode parseControlMode(const char* mode) {
 }
 
 float readWeightSensor() {
+  if (!weightSensorInitialized) {
+    scale.begin(HX711_DT, HX711_SCK);
+    scale.set_scale(calibration_factor);
+    scale.tare(20);
+    weightSensorInitialized = true;
+  }
   float weight = scale.get_units(WEIGHT_SAMPLE_COUNT);
   lastWeightReading = weight;
   return weight;
@@ -340,7 +347,9 @@ void activateSwitch(int valveIdInTopic) {
   valve.toleranceSatisfied =
       valve.controlMode == CONTROL_MODE_WEIGHT &&
       valve.toleranceWeight <= MIN_TOLERANCE_WEIGHT;
-  valve.startWeight = readWeightSensor();
+  valve.startWeight = valve.controlMode == CONTROL_MODE_WEIGHT
+                          ? readWeightSensor()
+                          : 0.0f;
   valve.lastWeight = valve.startWeight;
   valve.lastWeightReadTime = millis();
   valve.lastProgressPublishTime = millis();
@@ -610,10 +619,6 @@ void setup() {
   for (int i=0; i < MAX_VALVES; i++ ) {
     pinMode(valves[i].pin, OUTPUT);
   }
-
-  scale.begin(HX711_DT, HX711_SCK);
-  scale.set_scale(calibration_factor);
-  scale.tare(20);
 
   setDeviceId();
   connectWiFi();
