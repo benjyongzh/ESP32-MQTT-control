@@ -17,7 +17,6 @@ import SwitchStatusText from "./SwitchStatusText";
 import { useMqttClient } from "./hooks/useMqttClient";
 import { ControlClient } from "@/lib/control-client";
 import {
-  CONTROLLER_DEVICE_ID_TO_TOPIC,
   DEFAULT_HIGH_DURATION_MS,
   DEFAULT_TARGET_WEIGHT_CHANGE,
 } from "@/constants";
@@ -35,7 +34,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import ConfigItem from "./ConfigItem";
+import ConfigItem, { ConfigLoadState } from "./ConfigItem";
 import { Button } from "./ui/button";
 import { RotateCcw } from "lucide-react";
 
@@ -92,6 +91,9 @@ export default function ControlItem(props: {
     DEFAULT_TARGET_WEIGHT_CHANGE
   );
   const [heartbeatInterval, setHeartbeatInterval] = useState<number>(5);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [configLoadState, setConfigLoadState] =
+    useState<ConfigLoadState>("loading");
 
   const onMessageReceived = useCallback(
     (topic: string, payload: MqttMessageAny) => {
@@ -304,7 +306,7 @@ export default function ControlItem(props: {
         <SwitchStatusText status={status} />
       </div>
       <div className="flex justify-start">
-        <Dialog>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <div className="flex w-full items-center justify-between gap-3">
               <span className="flex-1 truncate">{formattedTopicString}</span>
@@ -411,7 +413,12 @@ export default function ControlItem(props: {
                   </AccordionTrigger>
                   <AccordionContent className="flex-1 overflow-hidden pb-0">
                     <div className="max-h-[30vh] overflow-y-auto">
-                      <ConfigItem client={client} topicItem={topicItem} />
+                      <ConfigItem
+                        client={client}
+                        topicItem={topicItem}
+                        isOpen={isDialogOpen}
+                        onConfigStateChange={setConfigLoadState}
+                      />
                     </div>
                   </AccordionContent>
                 </AccordionItem>
@@ -419,7 +426,11 @@ export default function ControlItem(props: {
             </Accordion>
             {showConfigControls ? (
               <DialogFooter className="shrink-0">
-                <Button type="submit" form={configFormId}>
+                <Button
+                  type="submit"
+                  form={configFormId}
+                  disabled={configLoadState === "loading"}
+                >
                   Save config
                 </Button>
               </DialogFooter>

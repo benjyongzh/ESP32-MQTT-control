@@ -32,12 +32,17 @@ import {
 import { Button } from "./ui/button";
 import { FormEvent } from "react";
 import ConfigInputField, { ConfigLabel } from "./ConfigInputField";
+import { LoaderCircle } from "lucide-react";
+
+export type ConfigLoadState = "loading" | "ready" | "missing";
 
 export default function ConfigItem(props: {
   client: ControlClient | null;
   topicItem: mqttTopicItem;
+  isOpen: boolean;
+  onConfigStateChange: (state: ConfigLoadState) => void;
 }) {
-  const { client, topicItem } = props;
+  const { client, topicItem, isOpen, onConfigStateChange } = props;
   const [controlMode, setControlMode] = useState<enumControlMode>(
     enumControlMode.WEIGHT
   );
@@ -70,6 +75,9 @@ export default function ConfigItem(props: {
   const [heartbeatIntervalDuration, setHeartbeatIntervalDuration] =
     useState<number>(5);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [hasReceivedConfig, setHasReceivedConfig] = useState(false);
+  const [configLoadState, setConfigLoadState] =
+    useState<ConfigLoadState>("loading");
 
   const sensorReadIntervalSeconds = useMemo(
     () => sensorReadIntervalMs / 1000,
@@ -107,46 +115,76 @@ export default function ConfigItem(props: {
     });
   }, []);
 
-  const onMessageReceived = useCallback((_topic: string, payload: MqttMessageAny) => {
-    switch (payload.type) {
-      case enumMqttTopicType.CONFIG:
-        if (payload.message.controlMode) {
-          setControlMode(payload.message.controlMode);
-        }
-        if (typeof payload.message.highDuration === "number") {
-          setHighDurationMs(payload.message.highDuration);
-        }
-        if (typeof payload.message.targetWeightChange === "number") {
-          setTargetWeightChange(payload.message.targetWeightChange);
-          setTargetWeightChangeInput(
-            payload.message.targetWeightChange.toString()
-          );
-        }
-        if (typeof payload.message.toleranceWeight === "number") {
-          setToleranceWeight(payload.message.toleranceWeight);
-          setToleranceWeightInput(payload.message.toleranceWeight.toString());
-        }
-        if (typeof payload.message.toleranceDurationMs === "number") {
-          setToleranceDurationMs(payload.message.toleranceDurationMs);
-        }
-        if (typeof payload.message.sensorReadIntervalMs === "number") {
-          setSensorReadIntervalMs(payload.message.sensorReadIntervalMs);
-        }
-        if (typeof payload.message.heartbeatInterval === "number") {
-          setHeartbeatIntervalDuration(payload.message.heartbeatInterval);
-        }
-        setErrors({});
-        break;
-      default:
-        break;
-    }
-  }, []);
+  const onMessageReceived = useCallback(
+    (_topic: string, payload: MqttMessageAny) => {
+      switch (payload.type) {
+        case enumMqttTopicType.CONFIG:
+          if (payload.message.controlMode) {
+            setControlMode(payload.message.controlMode);
+          }
+          if (typeof payload.message.highDuration === "number") {
+            setHighDurationMs(payload.message.highDuration);
+          }
+          if (typeof payload.message.targetWeightChange === "number") {
+            setTargetWeightChange(payload.message.targetWeightChange);
+            setTargetWeightChangeInput(
+              payload.message.targetWeightChange.toString()
+            );
+          }
+          if (typeof payload.message.toleranceWeight === "number") {
+            setToleranceWeight(payload.message.toleranceWeight);
+            setToleranceWeightInput(payload.message.toleranceWeight.toString());
+          }
+          if (typeof payload.message.toleranceDurationMs === "number") {
+            setToleranceDurationMs(payload.message.toleranceDurationMs);
+          }
+          if (typeof payload.message.sensorReadIntervalMs === "number") {
+            setSensorReadIntervalMs(payload.message.sensorReadIntervalMs);
+          }
+          if (typeof payload.message.heartbeatInterval === "number") {
+            setHeartbeatIntervalDuration(payload.message.heartbeatInterval);
+          }
+          setHasReceivedConfig(true);
+          setConfigLoadState("ready");
+          onConfigStateChange("ready");
+          setErrors({});
+          break;
+        default:
+          break;
+      }
+    },
+    [onConfigStateChange]
+  );
 
-  useMqttClient({
+  const { refreshTopics } = useMqttClient({
     mqttClient: client,
     topics: [topicConfig],
     onMessage: onMessageReceived,
   });
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    setHasReceivedConfig(false);
+    setConfigLoadState("loading");
+    setErrors({});
+    onConfigStateChange("loading");
+    refreshTopics();
+
+    const timeoutId = window.setTimeout(() => {
+      setHasReceivedConfig((current) => {
+        if (!current) {
+          setConfigLoadState("missing");
+          onConfigStateChange("missing");
+        }
+        return current;
+      });
+    }, 1500);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [isOpen, onConfigStateChange, refreshTopics]);
 
   const publishConfigSnapshot = useCallback(
     (
@@ -289,9 +327,27 @@ export default function ConfigItem(props: {
     [onValveConfigCommit]
   );
 
+  if (configLoadState === "loading") {
+    return (
+      <div className="flex min-h-40 items-center justify-center px-4 py-6 text-center">
+        <div className="flex max-w-xs flex-col items-center gap-3">
+          <LoaderCircle className="h-5 w-5 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">
+            Loading retained MQTT config for this valve...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <form id={formId} onSubmit={onSubmit} className="flex flex-col gap-4">
       <div className="space-y-4">
+        {configLoadState === "missing" ? (
+          <div className="rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+            No existing config detected for this valve. Default values are shown below.
+          </div>
+        ) : null}
         <div className="flex flex-col items-start justify-center gap-2 w-full">
           <ConfigLabel
             htmlFor={`${topicItem}-sensor-interval`}
