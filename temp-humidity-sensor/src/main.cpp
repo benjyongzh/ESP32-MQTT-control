@@ -96,7 +96,7 @@ String getCurrentTimestamp() {
 
 void setDeviceId() {
   const uint16_t suffix = getOrCreateDeviceSuffix();
-  snprintf(deviceId, sizeof(deviceId), "esp32-TH%04X", suffix);
+  snprintf(deviceId, sizeof(deviceId), "esp32-%04X", suffix);
   Serial.print("deviceId: ");
   Serial.println(deviceId);
 }
