@@ -189,6 +189,12 @@ class MockControlClient implements ControlClient {
         callback?.();
         return;
       }
+      if (this.isConfigSetTopic(topic)) {
+        const parsed = JSON.parse(message) as MqttConfigMessage;
+        this.handleConfig(topic, parsed);
+        callback?.();
+        return;
+      }
       const parsed = JSON.parse(message) as MqttMessageAny;
       const topicType = this.getTopicType(topic);
 
@@ -644,6 +650,10 @@ class MockControlClient implements ControlClient {
 
   private isStatusRequestTopic(topic: string) {
     return topic.endsWith(`/${enumMqttTopicType.STATUS}/get`);
+  }
+
+  private isConfigSetTopic(topic: string) {
+    return topic.endsWith(`/${enumMqttTopicType.CONFIG}/set`);
   }
 
   private getMockIpAddress(topicItem: string) {

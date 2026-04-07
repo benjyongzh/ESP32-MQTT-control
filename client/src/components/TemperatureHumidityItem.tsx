@@ -56,6 +56,7 @@ export default function TemperatureHumidityItem(props: {
     [topicItem]
   );
   const topicConfigGet = useMemo(() => `${topicConfig}/get`, [topicConfig]);
+  const topicConfigSet = useMemo(() => `${topicConfig}/set`, [topicConfig]);
   const topicHealth: mqttTopicId = useMemo(
     () => getMqttTopicId(topicItem, enumMqttTopicType.HEALTH),
     [topicItem]
@@ -310,8 +311,8 @@ export default function TemperatureHumidityItem(props: {
       timestamp: new Date().toISOString(),
     };
 
-    client?.publish(topicConfig, JSON.stringify(message), { retain: true });
-    toast.success(topicConfig, {
+    client?.publish(topicConfigSet, JSON.stringify(message), { retain: false });
+    toast.success(topicConfigSet, {
       description: `Heartbeat interval updated to ${nextHeartbeatIntervalSeconds.toFixed(
         0
       )}s`,
@@ -319,7 +320,7 @@ export default function TemperatureHumidityItem(props: {
   }, [
     client,
     heartbeatIntervalInput,
-    topicConfig,
+    topicConfigSet,
     validateHeartbeatInput,
   ]);
 

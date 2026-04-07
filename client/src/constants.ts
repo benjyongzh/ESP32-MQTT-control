@@ -30,8 +30,8 @@ export const CONTROLLER_DEVICE_ID_TO_TOPIC: Record<string, topicList> = {
 };
 
 export const TEMPERATURE_HUMIDITY_DEVICE_ID_TO_TOPIC: Record<string, topicList> = {
-  "esp32-TH01": { topic: "studyroom-climate", quantity: 1 },
-  "esp32-TH02": { topic: "livingroom-climate", quantity: 1 },
+  "esp32-EECB": { topic: "studyroom-temp", quantity: 1 },
+  // "esp32-TH02": { topic: "livingroom-climate", quantity: 1 },
 };
 
 export const AIRCON_DEVICE_ID = "mitsubishi-aircon";

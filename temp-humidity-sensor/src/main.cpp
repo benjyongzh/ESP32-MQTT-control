@@ -45,6 +45,7 @@ char topicStatus[96];
 char topicStatusGet[96];
 char topicConfig[96];
 char topicConfigGet[96];
+char topicConfigSet[96];
 char topicHealth[96];
 
 unsigned long heartbeatIntervalSeconds = DEFAULT_HEARTBEAT_INTERVAL_SECONDS;
@@ -109,6 +110,8 @@ void buildTopics() {
            COMPONENT_INDEX, TOPIC_TYPE_CONFIG);
   snprintf(topicConfigGet, sizeof(topicConfigGet), "%s/%u/%s/%s", deviceId,
            COMPONENT_INDEX, TOPIC_TYPE_CONFIG, TOPIC_ACTION_GET);
+  snprintf(topicConfigSet, sizeof(topicConfigSet), "%s/%u/%s/set", deviceId,
+           COMPONENT_INDEX, TOPIC_TYPE_CONFIG);
   snprintf(topicHealth, sizeof(topicHealth), "%s/%u/%s", deviceId,
            COMPONENT_INDEX, TOPIC_TYPE_HEALTH);
 }
@@ -302,7 +305,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     return;
   }
 
-  if (strcmp(topic, topicConfig) == 0) {
+  if (strcmp(topic, topicConfigSet) == 0) {
     onConfigMessage(doc);
   }
 }
@@ -311,9 +314,9 @@ void connectMQTT() {
   while (!mqttClient.connected()) {
     Serial.println("Attempting MQTT connection...");
     if (mqttClient.connect(deviceId, mqttUser, mqttPassword)) {
-      mqttClient.subscribe(topicConfig);
+      mqttClient.subscribe(topicConfigSet);
       Serial.print("MQTT subscribed to ");
-      Serial.println(topicConfig);
+      Serial.println(topicConfigSet);
       mqttClient.subscribe(topicConfigGet);
       Serial.print("MQTT subscribed to ");
       Serial.println(topicConfigGet);
