@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from "react";
-import { RotateCcw } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { LoaderCircle, RotateCcw, Thermometer } from "lucide-react";
 import { toast } from "sonner";
 
 import { ControlClient } from "@/lib/control-client";
@@ -30,14 +30,17 @@ import {
   AccordionTrigger,
 } from "./ui/accordion";
 import { Button } from "./ui/button";
+import { Input } from "./ui/input";
 import { Slider } from "./ui/slider";
 import { ConfigLabel } from "./ConfigInputField";
 import {
-  DEFAULT_TEMPERATURE_SENSOR_READ_INTERVAL_SECONDS,
-  MAX_TEMPERATURE_SENSOR_READ_INTERVAL_SECONDS,
-  MIN_TEMPERATURE_SENSOR_READ_INTERVAL_SECONDS,
+  DEFAULT_TEMPERATURE_SENSOR_HEARTBEAT_INTERVAL_SECONDS,
+  MAX_TEMPERATURE_SENSOR_HEARTBEAT_INTERVAL_SECONDS,
+  MIN_TEMPERATURE_SENSOR_HEARTBEAT_INTERVAL_SECONDS,
   TEMPERATURE_HUMIDITY_DEVICE_ID_TO_TOPIC,
 } from "@/constants";
+
+type ConfigLoadState = "loading" | "ready" | "missing";
 
 export default function TemperatureHumidityItem(props: {
   client: ControlClient | null;
@@ -52,10 +55,12 @@ export default function TemperatureHumidityItem(props: {
     () => getMqttTopicId(topicItem, enumMqttTopicType.CONFIG),
     [topicItem]
   );
+  const topicConfigGet = useMemo(() => `${topicConfig}/get`, [topicConfig]);
   const topicHealth: mqttTopicId = useMemo(
     () => getMqttTopicId(topicItem, enumMqttTopicType.HEALTH),
     [topicItem]
   );
+  const topicStatusGet = useMemo(() => `${topicStatus}/get`, [topicStatus]);
   const formId = useMemo(
     () => `sensor-config-${topicItem.replace("/", "-")}`,
     [topicItem]
@@ -63,13 +68,28 @@ export default function TemperatureHumidityItem(props: {
 
   const [temperature, setTemperature] = useState<number | null>(null);
   const [humidity, setHumidity] = useState<number | null>(null);
-  const [readingIntervalSeconds, setReadingIntervalSeconds] = useState<number>(
-    DEFAULT_TEMPERATURE_SENSOR_READ_INTERVAL_SECONDS
+  const [heartbeatIntervalSeconds, setHeartbeatIntervalSeconds] = useState<number>(
+    DEFAULT_TEMPERATURE_SENSOR_HEARTBEAT_INTERVAL_SECONDS
   );
+  const [heartbeatIntervalInput, setHeartbeatIntervalInput] = useState<string>(
+    DEFAULT_TEMPERATURE_SENSOR_HEARTBEAT_INTERVAL_SECONDS.toString()
+  );
+  const [heartbeatIntervalMinSeconds, setHeartbeatIntervalMinSeconds] =
+    useState<number>(MIN_TEMPERATURE_SENSOR_HEARTBEAT_INTERVAL_SECONDS);
+  const [heartbeatIntervalMaxSeconds, setHeartbeatIntervalMaxSeconds] =
+    useState<number>(MAX_TEMPERATURE_SENSOR_HEARTBEAT_INTERVAL_SECONDS);
+  const [heartbeatIntervalDefaultSeconds, setHeartbeatIntervalDefaultSeconds] =
+    useState<number>(DEFAULT_TEMPERATURE_SENSOR_HEARTBEAT_INTERVAL_SECONDS);
   const [ipAddress, setIpAddress] = useState("Unknown");
   const [online, setOnline] = useState<boolean>(false);
   const [lastReadingAt, setLastReadingAt] = useState("Unknown");
   const [lastHeartbeatAt, setLastHeartbeatAt] = useState("Unknown");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditingHeartbeatInput, setIsEditingHeartbeatInput] = useState(false);
+  const [heartbeatIntervalError, setHeartbeatIntervalError] = useState("");
+  const [configLoadState, setConfigLoadState] =
+    useState<ConfigLoadState>("loading");
+  const [hasReceivedConfig, setHasReceivedConfig] = useState(false);
 
   const onMessageReceived = useCallback(
     (topic: string, payload: MqttMessageAny) => {
@@ -80,17 +100,37 @@ export default function TemperatureHumidityItem(props: {
             const message = payload.message as SensorStatusPayload;
             setTemperature(message.temperature);
             setHumidity(message.humidity);
-            if (typeof message.readingIntervalSeconds === "number") {
-              setReadingIntervalSeconds(message.readingIntervalSeconds);
+            if (typeof message.heartbeatIntervalSeconds === "number") {
+              setHeartbeatIntervalSeconds(message.heartbeatIntervalSeconds);
             }
             setLastReadingAt(payload.timestamp);
           }
           break;
         case enumMqttTopicType.CONFIG:
           if (topic !== topicConfig) return;
-          if (typeof payload.message.readingIntervalSeconds === "number") {
-            setReadingIntervalSeconds(payload.message.readingIntervalSeconds);
+          if (typeof payload.message.heartbeatIntervalSeconds === "number") {
+            setHeartbeatIntervalSeconds(payload.message.heartbeatIntervalSeconds);
           }
+          if (typeof payload.message.heartbeatIntervalMinSeconds === "number") {
+            setHeartbeatIntervalMinSeconds(
+              payload.message.heartbeatIntervalMinSeconds
+            );
+          }
+          if (typeof payload.message.heartbeatIntervalMaxSeconds === "number") {
+            setHeartbeatIntervalMaxSeconds(
+              payload.message.heartbeatIntervalMaxSeconds
+            );
+          }
+          if (
+            typeof payload.message.heartbeatIntervalDefaultSeconds === "number"
+          ) {
+            setHeartbeatIntervalDefaultSeconds(
+              payload.message.heartbeatIntervalDefaultSeconds
+            );
+          }
+          setHasReceivedConfig(true);
+          setConfigLoadState("ready");
+          setHeartbeatIntervalError("");
           break;
         case enumMqttTopicType.HEALTH:
           if (topic !== topicHealth) return;
@@ -100,6 +140,9 @@ export default function TemperatureHumidityItem(props: {
             setOnline(Boolean(message.online));
             if (typeof message.lastReadingAt === "string") {
               setLastReadingAt(message.lastReadingAt);
+            }
+            if (typeof message.heartbeatIntervalSeconds === "number") {
+              setHeartbeatIntervalSeconds(message.heartbeatIntervalSeconds);
             }
             setLastHeartbeatAt(payload.timestamp);
           }
@@ -117,32 +160,12 @@ export default function TemperatureHumidityItem(props: {
     onMessage: onMessageReceived,
   });
 
-  const publishConfig = useCallback(() => {
-    const nextReadingIntervalSeconds = Math.min(
-      Math.max(
-        readingIntervalSeconds,
-        MIN_TEMPERATURE_SENSOR_READ_INTERVAL_SECONDS
-      ),
-      MAX_TEMPERATURE_SENSOR_READ_INTERVAL_SECONDS
-    );
-
-    setReadingIntervalSeconds(nextReadingIntervalSeconds);
-
-    const message: MqttConfigMessage = {
-      type: enumMqttTopicType.CONFIG,
-      message: {
-        readingIntervalSeconds: nextReadingIntervalSeconds,
-      },
-      timestamp: new Date().toISOString(),
-    };
-
-    client?.publish(topicConfig, JSON.stringify(message), { retain: true });
-    toast.success(topicConfig, {
-      description: `Sensor reading interval updated to ${nextReadingIntervalSeconds.toFixed(
-        0
-      )}s`,
-    });
-  }, [client, readingIntervalSeconds, topicConfig]);
+  useEffect(() => {
+    if (isEditingHeartbeatInput) {
+      return;
+    }
+    setHeartbeatIntervalInput(heartbeatIntervalSeconds.toFixed(0));
+  }, [heartbeatIntervalSeconds, isEditingHeartbeatInput]);
 
   const formattedTopic = useMemo(
     () =>
@@ -152,6 +175,153 @@ export default function TemperatureHumidityItem(props: {
       ),
     [topicItem]
   );
+
+  const requestCurrentReading = useCallback(() => {
+    const message = {
+      type: enumMqttTopicType.STATUS,
+      message: "GET",
+      timestamp: new Date().toISOString(),
+    };
+
+    client?.publish(topicStatusGet, JSON.stringify(message), { retain: false });
+    toast.success(formattedTopic, {
+      description: "Manual reading requested.",
+    });
+  }, [client, formattedTopic, topicStatusGet]);
+
+  const requestConfigSnapshot = useCallback(() => {
+    refreshTopics();
+
+    const message = {
+      type: enumMqttTopicType.CONFIG,
+      message: "GET",
+      timestamp: new Date().toISOString(),
+    };
+
+    client?.publish(topicConfigGet, JSON.stringify(message), { retain: false });
+  }, [client, refreshTopics, topicConfigGet]);
+
+  const refreshSensorInfo = useCallback(() => {
+    requestConfigSnapshot();
+
+    const message = {
+      type: enumMqttTopicType.STATUS,
+      message: "GET",
+      timestamp: new Date().toISOString(),
+    };
+
+    client?.publish(topicStatusGet, JSON.stringify(message), { retain: false });
+  }, [client, requestConfigSnapshot, topicStatusGet]);
+
+  useEffect(() => {
+    if (!isDialogOpen) {
+      return;
+    }
+
+    setHasReceivedConfig(false);
+    setConfigLoadState("loading");
+    setHeartbeatIntervalError("");
+    requestConfigSnapshot();
+
+    const timeoutId = window.setTimeout(() => {
+      setHasReceivedConfig((current) => {
+        if (!current) {
+          setConfigLoadState("missing");
+        }
+        return current;
+      });
+    }, 1500);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [isDialogOpen, requestConfigSnapshot]);
+
+  const validateHeartbeatInput = useCallback(
+    (value: string) => {
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) {
+        return {
+          error: "Heartbeat interval must be a valid number.",
+          value: null,
+        };
+      }
+
+      if (!Number.isInteger(parsed)) {
+        return {
+          error: "Heartbeat interval must be a whole number of seconds.",
+          value: null,
+        };
+      }
+
+      if (parsed < heartbeatIntervalMinSeconds) {
+        return {
+          error: `Heartbeat interval must be at least ${heartbeatIntervalMinSeconds}s.`,
+          value: null,
+        };
+      }
+
+      if (parsed > heartbeatIntervalMaxSeconds) {
+        return {
+          error: `Heartbeat interval must be at most ${heartbeatIntervalMaxSeconds}s.`,
+          value: null,
+        };
+      }
+
+      return {
+        error: "",
+        value: parsed,
+      };
+    },
+    [heartbeatIntervalMaxSeconds, heartbeatIntervalMinSeconds]
+  );
+
+  const commitHeartbeatInput = useCallback(() => {
+    const validation = validateHeartbeatInput(heartbeatIntervalInput);
+    if (validation.value === null) {
+      setHeartbeatIntervalError(validation.error);
+      return;
+    }
+
+    setHeartbeatIntervalError("");
+    setHeartbeatIntervalSeconds(validation.value);
+    setHeartbeatIntervalInput(validation.value.toFixed(0));
+  }, [
+    heartbeatIntervalInput,
+    validateHeartbeatInput,
+  ]);
+
+  const publishConfig = useCallback(() => {
+    const validation = validateHeartbeatInput(heartbeatIntervalInput);
+    if (validation.value === null) {
+      setHeartbeatIntervalError(validation.error);
+      return;
+    }
+
+    const nextHeartbeatIntervalSeconds = validation.value;
+
+    setHeartbeatIntervalSeconds(nextHeartbeatIntervalSeconds);
+    setHeartbeatIntervalInput(nextHeartbeatIntervalSeconds.toFixed(0));
+    setHeartbeatIntervalError("");
+
+    const message: MqttConfigMessage = {
+      type: enumMqttTopicType.CONFIG,
+      message: {
+        heartbeatIntervalSeconds: nextHeartbeatIntervalSeconds,
+      },
+      timestamp: new Date().toISOString(),
+    };
+
+    client?.publish(topicConfig, JSON.stringify(message), { retain: true });
+    toast.success(topicConfig, {
+      description: `Heartbeat interval updated to ${nextHeartbeatIntervalSeconds.toFixed(
+        0
+      )}s`,
+    });
+  }, [
+    client,
+    heartbeatIntervalInput,
+    topicConfig,
+    validateHeartbeatInput,
+  ]);
 
   const formattedTemperature = useMemo(
     () => (temperature === null ? "-" : `${temperature.toFixed(1)} C`),
@@ -177,16 +347,16 @@ export default function TemperatureHumidityItem(props: {
   );
 
   return (
-    <div className="table-grid-row-temp-humidity w-full border-b-1 border-primary-foreground py-2">
-      <div className="flex justify-start">
-        <Dialog>
+    <div className="flex w-full items-center gap-2 border-b-1 border-primary-foreground py-2">
+      <div className="min-w-0 flex-1">
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <div className="flex w-full cursor-pointer items-center justify-start">
               <span className="truncate">{formattedTopic}</span>
             </div>
           </DialogTrigger>
           <DialogContent
-            className="flex max-h-[60vh] min-h-0 max-w-xs flex-col overflow-hidden md:max-w-sm"
+            className="flex max-h-[80vh] min-h-0 max-w-xs flex-col overflow-hidden md:max-w-sm"
             forceMount
           >
             <Button
@@ -194,7 +364,7 @@ export default function TemperatureHumidityItem(props: {
               variant="ghost"
               className="absolute top-1.5 right-10"
               aria-label="Refresh sensor info"
-              onClick={() => refreshTopics()}
+              onClick={refreshSensorInfo}
             >
               <RotateCcw className="h-4 w-4" />
             </Button>
@@ -212,12 +382,14 @@ export default function TemperatureHumidityItem(props: {
                 <AccordionTrigger className="py-3 font-bold hover:no-underline">
                   System Info
                 </AccordionTrigger>
-                <AccordionContent className="max-h-[22vh] overflow-y-auto pr-1">
+                <AccordionContent className="max-h-[35vh] overflow-y-auto">
                   <div className="grid grid-cols-2 gap-1">
                     <div className="text-right after:content-[':']">IP Address</div>
                     <div className="text-left">{ipAddress}</div>
                     <div className="text-right after:content-[':']">MQTT Topic</div>
                     <div className="text-left">{topicItem}</div>
+                    <div className="text-right after:content-[':']">Device ID</div>
+                    <div className="text-left">{topicItem.split("/")[0]}</div>
                     <div className="text-right after:content-[':']">Online</div>
                     <div className="text-left">{online ? "Yes" : "No"}</div>
                     <div className="text-right after:content-[':']">Temperature</div>
@@ -228,6 +400,10 @@ export default function TemperatureHumidityItem(props: {
                     <div className="text-left">{formattedLastReading}</div>
                     <div className="text-right after:content-[':']">Last heartbeat</div>
                     <div className="text-left">{formattedHeartbeat}</div>
+                    <div className="text-right after:content-[':']">Heartbeat interval</div>
+                    <div className="text-left">
+                      {heartbeatIntervalSeconds.toFixed(0)} s
+                    </div>
                   </div>
                 </AccordionContent>
               </AccordionItem>
@@ -239,53 +415,119 @@ export default function TemperatureHumidityItem(props: {
                   Config
                 </AccordionTrigger>
                 <AccordionContent className="flex min-h-0 flex-1 flex-col overflow-hidden pb-0">
-                  <div className="min-h-0 flex-1 overflow-y-auto pr-1 pb-4">
+                  <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                    {configLoadState === "loading" ? (
+                      <div className="flex min-h-32 items-center justify-center px-4 py-6 text-center">
+                        <div className="flex max-w-xs flex-col items-center gap-3">
+                          <LoaderCircle className="h-5 w-5 animate-spin text-muted-foreground" />
+                          <p className="text-sm text-muted-foreground">
+                            Loading retained MQTT config for this sensor...
+                          </p>
+                        </div>
+                      </div>
+                    ) : null}
                     <form
                       id={formId}
                       onSubmit={(event) => {
                         event.preventDefault();
                         publishConfig();
                       }}
-                      className="flex flex-col gap-4"
+                      className={configLoadState === "loading" ? "hidden" : "flex flex-col gap-4"}
                     >
                       <div className="flex flex-col items-start justify-center gap-2 w-full">
                         <ConfigLabel
-                          htmlFor={`${topicItem}-reading-interval`}
-                          label="Reading interval"
-                          tooltip="How often the controller reads and publishes temperature and humidity updates."
+                          htmlFor={`${topicItem}-heartbeat-interval`}
+                          label="Heartbeat interval"
+                          tooltip="How often the sensor publishes a fresh temperature and humidity reading."
                         />
-                        <div className="flex w-full gap-2">
+                        <div className="flex w-full items-center justify-between gap-2">
                           <Slider
-                            value={[readingIntervalSeconds]}
-                            onValueChange={([value]) =>
-                              setReadingIntervalSeconds(value)
-                            }
-                            min={MIN_TEMPERATURE_SENSOR_READ_INTERVAL_SECONDS}
-                            max={MAX_TEMPERATURE_SENSOR_READ_INTERVAL_SECONDS}
+                            value={[heartbeatIntervalSeconds]}
+                            onValueChange={([value]) => {
+                              setHeartbeatIntervalSeconds(value);
+                              setHeartbeatIntervalInput(value.toFixed(0));
+                              setHeartbeatIntervalError("");
+                            }}
+                            min={heartbeatIntervalMinSeconds}
+                            max={heartbeatIntervalMaxSeconds}
                             step={1}
-                            name={`${topicItem}-reading-interval`}
-                            className="flex-3"
+                            name={`${topicItem}-heartbeat-interval`}
                           />
-                          <p className="flex-1 text-left">
-                            {readingIntervalSeconds.toFixed(0)} s
-                          </p>
+                            <Input
+                              id={`${topicItem}-heartbeat-interval`}
+                              type="number"
+                              min={heartbeatIntervalMinSeconds}
+                              max={heartbeatIntervalMaxSeconds}
+                              step={1}
+                              value={heartbeatIntervalInput}
+                              onChange={(event) => {
+                                setHeartbeatIntervalInput(event.target.value);
+                                if (heartbeatIntervalError) {
+                                  setHeartbeatIntervalError("");
+                                }
+                              }}
+                              onFocus={() => setIsEditingHeartbeatInput(true)}
+                              onBlur={() => {
+                                setIsEditingHeartbeatInput(false);
+                                commitHeartbeatInput();
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                  event.preventDefault();
+                                  commitHeartbeatInput();
+                                }
+                              }}
+                              aria-invalid={heartbeatIntervalError ? true : undefined}
+                              className="text-center w-auto"
+                            />
+                            <p>s</p>
                         </div>
+                        {heartbeatIntervalError ? (
+                          <p className="text-sm text-destructive">
+                            {heartbeatIntervalError}
+                          </p>
+                        ) : null}
+                        {configLoadState === "missing" ? (
+                          <p className="text-sm text-muted-foreground">
+                            No retained config was found. Default values are shown
+                            until you save.
+                          </p>
+                        ) : null}
+                        <p className="text-sm text-muted-foreground">
+                          Default {heartbeatIntervalDefaultSeconds}s, min{" "}
+                          {heartbeatIntervalMinSeconds}s, max{" "}
+                          {heartbeatIntervalMaxSeconds}s.
+                        </p>
                       </div>
                     </form>
                   </div>
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
-            <DialogFooter className="shrink-0 border-t bg-background pt-3">
-              <Button type="submit" form={formId}>
+            <DialogFooter className="shrink-0">
+              <Button
+                type="submit"
+                form={formId}
+                disabled={configLoadState === "loading"}
+              >
                 Save config
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
-      <div className="text-center">{formattedTemperature}</div>
-      <div className="text-center">{formattedHumidity}</div>
+      <div className="w-14 shrink-0 text-center">{formattedTemperature}</div>
+      <div className="w-16 shrink-0 text-center">{formattedHumidity}</div>
+      <div className="flex w-10 shrink-0 items-center justify-end">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={requestCurrentReading}
+          aria-label={`Request current reading for ${formattedTopic}`}
+        >
+          <Thermometer className="h-4 w-4" />
+        </Button>
+      </div>
     </div>
   );
 }

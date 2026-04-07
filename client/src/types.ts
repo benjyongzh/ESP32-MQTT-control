@@ -58,7 +58,7 @@ export interface ValveStatusPayload {
 export interface SensorStatusPayload {
   temperature: number;
   humidity: number;
-  readingIntervalSeconds?: number;
+  heartbeatIntervalSeconds?: number;
 }
 
 export interface MqttStatusMessage
@@ -80,6 +80,7 @@ export interface SensorHealthPayload {
   ipAddress: string;
   online: boolean;
   lastReadingAt?: string;
+  heartbeatIntervalSeconds?: number;
 }
 
 export interface MqttHealthMessage extends MqttMessage<mqttHealthMessage> {
@@ -107,7 +108,11 @@ export interface ValveControlConfig {
 }
 
 export interface SensorReaderConfig {
-  readingIntervalSeconds?: number;
+  heartbeatIntervalSeconds?: number;
+  heartbeatInterval?: number;
+  heartbeatIntervalMinSeconds?: number;
+  heartbeatIntervalMaxSeconds?: number;
+  heartbeatIntervalDefaultSeconds?: number;
 }
 
 export type mqttConfigMessage = ValveControlConfig & SensorReaderConfig;

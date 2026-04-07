@@ -1,31 +1,28 @@
+#include <Adafruit_AHTX0.h>
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <EEPROM.h>
 #include <PubSubClient.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
-#include <time.h>
-#include <DHT.h>
+#include <Wire.h>
 #include <secrets.h>
+#include <time.h>
 
 namespace {
 constexpr int EEPROM_SIZE = 8;
-constexpr int DHT_PIN = 4;
-constexpr int WIFI_STATUS_PIN = 27;
-constexpr int MQTT_STATUS_PIN = 25;
-constexpr uint8_t DHT_TYPE = DHT22;
+constexpr uint8_t AHT10_SCL_PIN = 27;
+constexpr uint8_t AHT10_SDA_PIN = 25;
+constexpr uint8_t COMPONENT_INDEX = 1;
 
-constexpr float DEFAULT_READING_INTERVAL_SECONDS = 5.0f;
-constexpr float MIN_READING_INTERVAL_SECONDS = 1.0f;
-constexpr float MAX_READING_INTERVAL_SECONDS = 30.0f;
-constexpr float DEFAULT_HEALTH_INTERVAL_MINUTES = 5.0f;
-constexpr float MIN_HEALTH_INTERVAL_MINUTES = 0.1f;
-constexpr float MAX_HEALTH_INTERVAL_MINUTES = 20.0f;
+constexpr unsigned long DEFAULT_HEARTBEAT_INTERVAL_SECONDS = 60;
+constexpr unsigned long MIN_HEARTBEAT_INTERVAL_SECONDS = 1;
+constexpr unsigned long MAX_HEARTBEAT_INTERVAL_SECONDS = 6000;
 
-constexpr int COMPONENT_INDEX = 1;
 constexpr char TOPIC_TYPE_STATUS[] = "status";
 constexpr char TOPIC_TYPE_CONFIG[] = "config";
 constexpr char TOPIC_TYPE_HEALTH[] = "controllerhealth";
+constexpr char TOPIC_ACTION_GET[] = "get";
 
 constexpr long GMT_OFFSET_SEC = 0;
 constexpr int DAYLIGHT_OFFSET_SEC = 0;
@@ -41,21 +38,21 @@ const char* mqttPassword = MQTT_PASSWORD;
 
 WiFiClientSecure wifiClient;
 PubSubClient mqttClient(wifiClient);
-DHT dht(DHT_PIN, DHT_TYPE);
+Adafruit_AHTX0 aht;
 
 char deviceId[32];
 char topicStatus[96];
+char topicStatusGet[96];
 char topicConfig[96];
+char topicConfigGet[96];
 char topicHealth[96];
 
-float readingIntervalSeconds = DEFAULT_READING_INTERVAL_SECONDS;
-float healthIntervalMinutes = DEFAULT_HEALTH_INTERVAL_MINUTES;
+unsigned long heartbeatIntervalSeconds = DEFAULT_HEARTBEAT_INTERVAL_SECONDS;
 float lastTemperature = NAN;
 float lastHumidity = NAN;
 String lastReadingTimestamp = "unknown";
 
-unsigned long lastReadAtMs = 0;
-unsigned long lastHealthPublishAtMs = 0;
+unsigned long lastHeartbeatPublishAtMs = 0;
 
 uint16_t getOrCreateDeviceSuffix() {
   uint16_t value;
@@ -71,7 +68,8 @@ uint16_t getOrCreateDeviceSuffix() {
   return value;
 }
 
-float clampFloat(float value, float minValue, float maxValue) {
+unsigned long clampUnsignedLong(unsigned long value, unsigned long minValue,
+                                unsigned long maxValue) {
   if (value < minValue) return minValue;
   if (value > maxValue) return maxValue;
   return value;
@@ -87,48 +85,57 @@ String getCurrentTimestamp() {
   gettimeofday(&now, nullptr);
 
   char buffer[32];
-  snprintf(
-    buffer,
-    sizeof(buffer),
-    "%04d-%02d-%02dT%02d:%02d:%02d.%03ldZ",
-    timeInfo.tm_year + 1900,
-    timeInfo.tm_mon + 1,
-    timeInfo.tm_mday,
-    timeInfo.tm_hour,
-    timeInfo.tm_min,
-    timeInfo.tm_sec,
-    now.tv_usec / 1000);
+  snprintf(buffer, sizeof(buffer), "%04d-%02d-%02dT%02d:%02d:%02d.%03ldZ",
+           timeInfo.tm_year + 1900, timeInfo.tm_mon + 1, timeInfo.tm_mday,
+           timeInfo.tm_hour, timeInfo.tm_min, timeInfo.tm_sec,
+           now.tv_usec / 1000);
 
   return String(buffer);
 }
 
-void buildTopics() {
-  snprintf(topicStatus, sizeof(topicStatus), "%s/%d/%s", deviceId, COMPONENT_INDEX, TOPIC_TYPE_STATUS);
-  snprintf(topicConfig, sizeof(topicConfig), "%s/%d/%s", deviceId, COMPONENT_INDEX, TOPIC_TYPE_CONFIG);
-  snprintf(topicHealth, sizeof(topicHealth), "%s/%d/%s", deviceId, COMPONENT_INDEX, TOPIC_TYPE_HEALTH);
+void setDeviceId() {
+  const uint16_t suffix = getOrCreateDeviceSuffix();
+  snprintf(deviceId, sizeof(deviceId), "esp32-TH%04X", suffix);
+  Serial.print("deviceId: ");
+  Serial.println(deviceId);
 }
 
-void setDeviceId() {
-  uint16_t suffix = getOrCreateDeviceSuffix();
-  snprintf(deviceId, sizeof(deviceId), "esp32-TH%04X", suffix);
+void buildTopics() {
+  snprintf(topicStatus, sizeof(topicStatus), "%s/%u/%s", deviceId,
+           COMPONENT_INDEX, TOPIC_TYPE_STATUS);
+  snprintf(topicStatusGet, sizeof(topicStatusGet), "%s/%u/%s/%s", deviceId,
+           COMPONENT_INDEX, TOPIC_TYPE_STATUS, TOPIC_ACTION_GET);
+  snprintf(topicConfig, sizeof(topicConfig), "%s/%u/%s", deviceId,
+           COMPONENT_INDEX, TOPIC_TYPE_CONFIG);
+  snprintf(topicConfigGet, sizeof(topicConfigGet), "%s/%u/%s/%s", deviceId,
+           COMPONENT_INDEX, TOPIC_TYPE_CONFIG, TOPIC_ACTION_GET);
+  snprintf(topicHealth, sizeof(topicHealth), "%s/%u/%s", deviceId,
+           COMPONENT_INDEX, TOPIC_TYPE_HEALTH);
 }
 
 bool publishJson(const char* topic, JsonDocument& doc, bool retain = true) {
   doc["timestamp"] = getCurrentTimestamp();
 
-  char payload[256];
-  serializeJson(doc, payload, sizeof(payload));
+  char payload[384];
+  const size_t payloadLength = serializeJson(doc, payload, sizeof(payload));
+  if (payloadLength == 0 || payloadLength >= sizeof(payload) - 1) {
+    Serial.print("Message too large to serialize safely [");
+    Serial.print(topic);
+    Serial.println("]");
+    return false;
+  }
 
   const bool published = mqttClient.publish(topic, payload, retain);
   if (published) {
-    Serial.print("Published [");
+    Serial.print("Message PUBLISHED [");
     Serial.print(topic);
     Serial.print("]: ");
-    Serial.println(payload);
+    Serial.println(String(payload));
   } else {
-    Serial.print("Publish failed [");
+    Serial.print("Message failed to publish [");
     Serial.print(topic);
-    Serial.println("]");
+    Serial.print("] payloadLength=");
+    Serial.println(payloadLength);
   }
 
   return published;
@@ -137,62 +144,84 @@ bool publishJson(const char* topic, JsonDocument& doc, bool retain = true) {
 void publishConfig() {
   JsonDocument doc;
   doc["type"] = TOPIC_TYPE_CONFIG;
-  doc["message"]["readingIntervalSeconds"] = readingIntervalSeconds;
+
+  JsonObject message = doc["message"].to<JsonObject>();
+  message["heartbeatIntervalSeconds"] = heartbeatIntervalSeconds;
+  message["heartbeatIntervalMinSeconds"] = MIN_HEARTBEAT_INTERVAL_SECONDS;
+  message["heartbeatIntervalMaxSeconds"] = MAX_HEARTBEAT_INTERVAL_SECONDS;
+  message["heartbeatIntervalDefaultSeconds"] =
+      DEFAULT_HEARTBEAT_INTERVAL_SECONDS;
+
   publishJson(topicConfig, doc, true);
 }
 
 void publishHealth() {
   JsonDocument doc;
   doc["type"] = TOPIC_TYPE_HEALTH;
-  doc["message"]["ipAddress"] = WiFi.localIP().toString();
-  doc["message"]["online"] = true;
-  doc["message"]["lastReadingAt"] = lastReadingTimestamp;
+
+  JsonObject message = doc["message"].to<JsonObject>();
+  message["ipAddress"] = WiFi.localIP().toString();
+  message["online"] = true;
+  message["lastReadingAt"] = lastReadingTimestamp;
+  message["heartbeatIntervalSeconds"] = heartbeatIntervalSeconds;
+
   publishJson(topicHealth, doc, true);
 }
 
-void publishStatus() {
+void publishStatus(bool retain = false) {
   if (isnan(lastTemperature) || isnan(lastHumidity)) {
     return;
   }
 
   JsonDocument doc;
   doc["type"] = TOPIC_TYPE_STATUS;
-  doc["message"]["temperature"] = lastTemperature;
-  doc["message"]["humidity"] = lastHumidity;
-  doc["message"]["readingIntervalSeconds"] = readingIntervalSeconds;
-  publishJson(topicStatus, doc, false);
+
+  JsonObject message = doc["message"].to<JsonObject>();
+  message["temperature"] = lastTemperature;
+  message["humidity"] = lastHumidity;
+  message["heartbeatIntervalSeconds"] = heartbeatIntervalSeconds;
+
+  publishJson(topicStatus, doc, retain);
 }
 
-void readSensorAndPublish() {
-  const float temperature = dht.readTemperature();
-  const float humidity = dht.readHumidity();
+bool readSensor() {
+  sensors_event_t humidityEvent;
+  sensors_event_t temperatureEvent;
 
-  if (isnan(temperature) || isnan(humidity)) {
-    Serial.println("DHT read failed");
+  aht.getEvent(&humidityEvent, &temperatureEvent);
+
+  if (isnan(temperatureEvent.temperature) ||
+      isnan(humidityEvent.relative_humidity)) {
+    Serial.println("AHT10 read failed");
+    return false;
+  }
+
+  lastTemperature = temperatureEvent.temperature;
+  lastHumidity = humidityEvent.relative_humidity;
+  lastReadingTimestamp = getCurrentTimestamp();
+  return true;
+}
+
+void publishCurrentReading(bool refreshSensor) {
+  if (refreshSensor && !readSensor()) {
     return;
   }
 
-  lastTemperature = temperature;
-  lastHumidity = humidity;
-  lastReadingTimestamp = getCurrentTimestamp();
-
-  publishStatus();
+  publishStatus(false);
   publishHealth();
 }
 
 void connectWiFi() {
-  Serial.print("Connecting to WiFi");
+  Serial.print("Connecting to WiFi...");
   WiFi.begin(ssid, password);
 
   while (WiFi.status() != WL_CONNECTED) {
-    digitalWrite(WIFI_STATUS_PIN, !digitalRead(WIFI_STATUS_PIN));
     delay(1000);
     Serial.print(".");
   }
 
-  digitalWrite(WIFI_STATUS_PIN, HIGH);
-  Serial.println();
-  Serial.print("WiFi connected. IP: ");
+  Serial.println("\nWiFi connected!");
+  Serial.print("IP Address: ");
   Serial.println(WiFi.localIP());
 }
 
@@ -203,21 +232,38 @@ void syncTime() {
     Serial.println("Waiting for NTP time");
     delay(500);
   }
+  Serial.println("Time synchronized:");
+  Serial.println(&timeInfo, "%Y-%m-%d %H:%M:%S");
+}
+
+void testDNS() {
+  Serial.println("\nTesting DNS resolution for MQTT server...");
+  IPAddress resolvedIP;
+  if (WiFi.hostByName(mqttServer, resolvedIP)) {
+    Serial.print("DNS resolved: ");
+    Serial.println(resolvedIP);
+  } else {
+    Serial.println("DNS resolution failed!");
+  }
 }
 
 void onConfigMessage(const JsonDocument& doc) {
-  if (doc["message"]["readingIntervalSeconds"].is<float>()) {
-    readingIntervalSeconds = clampFloat(
-      doc["message"]["readingIntervalSeconds"].as<float>(),
-      MIN_READING_INTERVAL_SECONDS,
-      MAX_READING_INTERVAL_SECONDS);
+  const JsonVariantConst message = doc["message"];
+  if (message.isNull()) {
+    publishConfig();
+    return;
   }
 
-  if (doc["message"]["heartbeatInterval"].is<float>()) {
-    healthIntervalMinutes = clampFloat(
-      doc["message"]["heartbeatInterval"].as<float>(),
-      MIN_HEALTH_INTERVAL_MINUTES,
-      MAX_HEALTH_INTERVAL_MINUTES);
+  if (message["heartbeatIntervalSeconds"].is<unsigned long>()) {
+    heartbeatIntervalSeconds =
+        clampUnsignedLong(message["heartbeatIntervalSeconds"].as<unsigned long>(),
+                          MIN_HEARTBEAT_INTERVAL_SECONDS,
+                          MAX_HEARTBEAT_INTERVAL_SECONDS);
+  } else if (message["heartbeatInterval"].is<unsigned long>()) {
+    heartbeatIntervalSeconds =
+        clampUnsignedLong(message["heartbeatInterval"].as<unsigned long>(),
+                          MIN_HEARTBEAT_INTERVAL_SECONDS,
+                          MAX_HEARTBEAT_INTERVAL_SECONDS);
   }
 
   publishConfig();
@@ -225,16 +271,34 @@ void onConfigMessage(const JsonDocument& doc) {
 }
 
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
+  Serial.print("Message RECEIVED [");
+  Serial.print(topic);
+  Serial.print("]: ");
+
+  if (strcmp(topic, topicConfigGet) == 0) {
+    Serial.println("(config get request)");
+    publishConfig();
+    return;
+  }
+
+  if (strcmp(topic, topicStatusGet) == 0) {
+    Serial.println("(status get request)");
+    publishCurrentReading(true);
+    return;
+  }
+
   String message;
   message.reserve(length);
   for (unsigned int i = 0; i < length; ++i) {
     message += static_cast<char>(payload[i]);
   }
+  Serial.println(message);
 
   JsonDocument doc;
   const DeserializationError error = deserializeJson(doc, message);
   if (error) {
-    Serial.println("Failed to parse MQTT payload");
+    Serial.print("deserializeJson() failed: ");
+    Serial.println(error.c_str());
     return;
   }
 
@@ -248,34 +312,47 @@ void connectMQTT() {
     Serial.println("Attempting MQTT connection...");
     if (mqttClient.connect(deviceId, mqttUser, mqttPassword)) {
       mqttClient.subscribe(topicConfig);
-      digitalWrite(MQTT_STATUS_PIN, HIGH);
+      Serial.print("MQTT subscribed to ");
+      Serial.println(topicConfig);
+      mqttClient.subscribe(topicConfigGet);
+      Serial.print("MQTT subscribed to ");
+      Serial.println(topicConfigGet);
+      mqttClient.subscribe(topicStatusGet);
+      Serial.print("MQTT subscribed to ");
+      Serial.println(topicStatusGet);
+      Serial.println("MQTT connected!");
       publishConfig();
       publishHealth();
       if (!isnan(lastTemperature) && !isnan(lastHumidity)) {
-        publishStatus();
+        publishStatus(false);
       }
       return;
     }
 
-    digitalWrite(MQTT_STATUS_PIN, !digitalRead(MQTT_STATUS_PIN));
-    Serial.print("MQTT connect failed, state=");
+    Serial.print("failed. mqttClientState = ");
     Serial.println(mqttClient.state());
     delay(1000);
+  }
+}
+
+void setupSensor() {
+  Wire.begin(AHT10_SDA_PIN, AHT10_SCL_PIN);
+
+  if (!aht.begin(&Wire)) {
+    Serial.println("Failed to initialize AHT10 sensor");
+    while (true) {
+      delay(1000);
+    }
   }
 }
 
 void setup() {
   Serial.begin(115200);
 
-  pinMode(WIFI_STATUS_PIN, OUTPUT);
-  pinMode(MQTT_STATUS_PIN, OUTPUT);
-  digitalWrite(WIFI_STATUS_PIN, LOW);
-  digitalWrite(MQTT_STATUS_PIN, LOW);
-
   setDeviceId();
   buildTopics();
+  setupSensor();
 
-  dht.begin();
   wifiClient.setInsecure();
 
   connectWiFi();
@@ -283,34 +360,30 @@ void setup() {
 
   mqttClient.setServer(mqttServer, mqttPort);
   mqttClient.setCallback(mqttCallback);
+  mqttClient.setBufferSize(512);
 
-  readSensorAndPublish();
+  publishCurrentReading(true);
+  lastHeartbeatPublishAtMs = millis();
 }
 
 void loop() {
   if (WiFi.status() != WL_CONNECTED) {
     connectWiFi();
+    syncTime();
   }
 
   if (!mqttClient.connected()) {
+    testDNS();
     connectMQTT();
   }
 
   mqttClient.loop();
 
   const unsigned long now = millis();
-  const unsigned long readingIntervalMs =
-    static_cast<unsigned long>(readingIntervalSeconds * 1000.0f);
-  const unsigned long healthIntervalMs =
-    static_cast<unsigned long>(healthIntervalMinutes * 60.0f * 1000.0f);
+  const unsigned long heartbeatIntervalMs = heartbeatIntervalSeconds * 1000UL;
 
-  if (now - lastReadAtMs >= readingIntervalMs) {
-    lastReadAtMs = now;
-    readSensorAndPublish();
-  }
-
-  if (now - lastHealthPublishAtMs >= healthIntervalMs) {
-    lastHealthPublishAtMs = now;
-    publishHealth();
+  if (now - lastHeartbeatPublishAtMs >= heartbeatIntervalMs) {
+    lastHeartbeatPublishAtMs = now;
+    publishCurrentReading(true);
   }
 }

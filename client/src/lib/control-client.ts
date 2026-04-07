@@ -2,7 +2,7 @@ import mqtt from "mqtt";
 import {
   CONTROLLER_DEVICE_ID_TO_TOPIC,
   DEFAULT_HIGH_DURATION_MS,
-  DEFAULT_TEMPERATURE_SENSOR_READ_INTERVAL_SECONDS,
+  DEFAULT_TEMPERATURE_SENSOR_HEARTBEAT_INTERVAL_SECONDS,
   DEFAULT_TARGET_WEIGHT_CHANGE,
   DEFAULT_TOLERANCE_DURATION_MS,
   DEFAULT_TOLERANCE_WEIGHT,
@@ -12,13 +12,13 @@ import {
   MAX_HIGH_DURATION_MS,
   MAX_TOLERANCE_DURATION_MS,
   MAX_SENSOR_READ_INTERVAL_MS,
-  MAX_TEMPERATURE_SENSOR_READ_INTERVAL_SECONDS,
+  MAX_TEMPERATURE_SENSOR_HEARTBEAT_INTERVAL_SECONDS,
   MIN_HIGH_DURATION_MS,
   MIN_TARGET_WEIGHT_CHANGE,
   MIN_TOLERANCE_DURATION_MS,
   MIN_TOLERANCE_WEIGHT,
   MIN_SENSOR_READ_INTERVAL_MS,
-  MIN_TEMPERATURE_SENSOR_READ_INTERVAL_SECONDS,
+  MIN_TEMPERATURE_SENSOR_HEARTBEAT_INTERVAL_SECONDS,
   TEMPERATURE_HUMIDITY_DEVICE_ID_TO_TOPIC,
   USE_MOCK_IRRIGATION_DATA,
 } from "@/constants";
@@ -87,12 +87,12 @@ type MockValveState = {
 };
 
 type MockSensorState = {
-  readingIntervalSeconds: number;
+  heartbeatIntervalSeconds: number;
   temperature: number;
   humidity: number;
   online: boolean;
   lastReadingAt: string;
-  readingTimer: number | null;
+  heartbeatTimer: number | null;
 };
 
 const HEARTBEAT_DEFAULT_MINUTES = 5;
@@ -155,14 +155,15 @@ class MockControlClient implements ControlClient {
     const sensorTopicItems = getArrayOfTopicItems(TEMPERATURE_HUMIDITY_DEVICE_ID_TO_TOPIC);
     sensorTopicItems.forEach((topicItem, index) => {
       this.sensors.set(topicItem, {
-        readingIntervalSeconds: DEFAULT_TEMPERATURE_SENSOR_READ_INTERVAL_SECONDS,
+        heartbeatIntervalSeconds:
+          DEFAULT_TEMPERATURE_SENSOR_HEARTBEAT_INTERVAL_SECONDS,
         temperature: 24.5 + index * 1.2,
         humidity: 62 - index * 4,
         online: true,
         lastReadingAt: new Date().toISOString(),
-        readingTimer: null,
+        heartbeatTimer: null,
       });
-      this.scheduleSensorRead(topicItem);
+      this.scheduleSensorHeartbeat(topicItem);
     });
 
     window.setTimeout(() => {
@@ -178,12 +179,17 @@ class MockControlClient implements ControlClient {
     callback?: PublishCallback
   ) {
     try {
-      const parsed = JSON.parse(message) as MqttMessageAny;
       if (this.isConfigRequestTopic(topic)) {
         this.handleConfigRequest(topic);
         callback?.();
         return;
       }
+      if (this.isStatusRequestTopic(topic)) {
+        this.handleStatusRequest(topic);
+        callback?.();
+        return;
+      }
+      const parsed = JSON.parse(message) as MqttMessageAny;
       const topicType = this.getTopicType(topic);
 
       if (topicType === enumMqttTopicType.CONTROL) {
@@ -250,13 +256,18 @@ class MockControlClient implements ControlClient {
 
     if (sensor) {
       const config = payload.message as SensorReaderConfig;
-      if (typeof config.readingIntervalSeconds === "number") {
-        sensor.readingIntervalSeconds = clamp(
-          config.readingIntervalSeconds,
-          MIN_TEMPERATURE_SENSOR_READ_INTERVAL_SECONDS,
-          MAX_TEMPERATURE_SENSOR_READ_INTERVAL_SECONDS
+      const nextHeartbeat =
+        typeof config.heartbeatIntervalSeconds === "number"
+          ? config.heartbeatIntervalSeconds
+          : config.heartbeatInterval;
+
+      if (typeof nextHeartbeat === "number") {
+        sensor.heartbeatIntervalSeconds = clamp(
+          nextHeartbeat,
+          MIN_TEMPERATURE_SENSOR_HEARTBEAT_INTERVAL_SECONDS,
+          MAX_TEMPERATURE_SENSOR_HEARTBEAT_INTERVAL_SECONDS
         );
-        this.scheduleSensorRead(topicItem);
+        this.scheduleSensorHeartbeat(topicItem);
       }
       this.publishConfig(topicItem);
       this.publishHealth(topicItem);
@@ -321,6 +332,18 @@ class MockControlClient implements ControlClient {
     const topicItem = this.getTopicItem(topic);
     if (!topicItem) return;
     this.publishConfig(topicItem);
+  }
+
+  private handleStatusRequest(topic: string) {
+    const topicItem = this.getTopicItem(topic);
+    if (!topicItem) return;
+
+    const sensor = this.sensors.get(topicItem);
+    if (!sensor) return;
+
+    this.advanceSensorReading(sensor);
+    this.publishStatus(topicItem, undefined);
+    this.publishHealth(topicItem);
   }
 
   private activateValve(topicItem: string, valve: MockValveState) {
@@ -421,29 +444,25 @@ class MockControlClient implements ControlClient {
     this.heartbeatTimers.set(topicItem, timer);
   }
 
-  private scheduleSensorRead(topicItem: string) {
+  private scheduleSensorHeartbeat(topicItem: string) {
     const sensor = this.sensors.get(topicItem);
     if (!sensor) return;
 
-    if (sensor.readingTimer !== null) {
-      window.clearInterval(sensor.readingTimer);
+    if (sensor.heartbeatTimer !== null) {
+      window.clearInterval(sensor.heartbeatTimer);
     }
 
-    sensor.readingTimer = window.setInterval(() => {
-      sensor.temperature = clamp(
-        sensor.temperature + (Math.random() - 0.5) * 0.8,
-        20,
-        32
-      );
-      sensor.humidity = clamp(
-        sensor.humidity + (Math.random() - 0.5) * 3,
-        40,
-        80
-      );
-      sensor.lastReadingAt = new Date().toISOString();
+    sensor.heartbeatTimer = window.setInterval(() => {
+      this.advanceSensorReading(sensor);
       this.publishStatus(topicItem, undefined);
       this.publishHealth(topicItem);
-    }, sensor.readingIntervalSeconds * 1000);
+    }, sensor.heartbeatIntervalSeconds * 1000);
+  }
+
+  private advanceSensorReading(sensor: MockSensorState) {
+    sensor.temperature = clamp(sensor.temperature + (Math.random() - 0.5) * 0.8, 20, 32);
+    sensor.humidity = clamp(sensor.humidity + (Math.random() - 0.5) * 3, 40, 80);
+    sensor.lastReadingAt = new Date().toISOString();
   }
 
   private publishSnapshot(topic: string) {
@@ -497,7 +516,13 @@ class MockControlClient implements ControlClient {
     const message: MqttConfigMessage = {
       type: enumMqttTopicType.CONFIG,
       message: {
-        readingIntervalSeconds: sensor.readingIntervalSeconds,
+        heartbeatIntervalSeconds: sensor.heartbeatIntervalSeconds,
+        heartbeatIntervalMinSeconds:
+          MIN_TEMPERATURE_SENSOR_HEARTBEAT_INTERVAL_SECONDS,
+        heartbeatIntervalMaxSeconds:
+          MAX_TEMPERATURE_SENSOR_HEARTBEAT_INTERVAL_SECONDS,
+        heartbeatIntervalDefaultSeconds:
+          DEFAULT_TEMPERATURE_SENSOR_HEARTBEAT_INTERVAL_SECONDS,
       },
       timestamp: new Date().toISOString(),
     };
@@ -531,6 +556,7 @@ class MockControlClient implements ControlClient {
         ipAddress: this.getMockIpAddress(topicItem),
         online: sensor.online,
         lastReadingAt: sensor.lastReadingAt,
+        heartbeatIntervalSeconds: sensor.heartbeatIntervalSeconds,
       },
       timestamp: new Date().toISOString(),
     };
@@ -552,7 +578,7 @@ class MockControlClient implements ControlClient {
         message: {
           temperature: Number(sensor.temperature.toFixed(1)),
           humidity: Number(sensor.humidity.toFixed(1)),
-          readingIntervalSeconds: sensor.readingIntervalSeconds,
+          heartbeatIntervalSeconds: sensor.heartbeatIntervalSeconds,
         },
         timestamp: sensor.lastReadingAt,
       };
@@ -614,6 +640,10 @@ class MockControlClient implements ControlClient {
 
   private isConfigRequestTopic(topic: string) {
     return topic.endsWith(`/${enumMqttTopicType.CONFIG}/get`);
+  }
+
+  private isStatusRequestTopic(topic: string) {
+    return topic.endsWith(`/${enumMqttTopicType.STATUS}/get`);
   }
 
   private getMockIpAddress(topicItem: string) {

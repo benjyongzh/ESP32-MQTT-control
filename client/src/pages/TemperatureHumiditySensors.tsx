@@ -44,11 +44,12 @@ export default function TemperatureHumiditySensors() {
         </p>
       </div>
 
-      <div className="flex max-w-screen-lg flex-col">
-        <div className="table-grid-row-temp-humidity border-b-1 border-primary-foreground pb-2">
-          <div className="text-left">Topic</div>
-          <div className="text-center truncate">Temp.</div>
-          <div className="text-center truncate">Humidity</div>
+      <div className="flex w-full max-w-screen-lg flex-col">
+        <div className="flex w-full items-center gap-2 border-b-1 border-primary-foreground pb-2">
+          <div className="min-w-0 flex-1 text-left">Topic</div>
+          <div className="w-14 shrink-0 text-center truncate">Temp.</div>
+          <div className="w-16 shrink-0 text-center truncate">Humidity</div>
+          <div className="w-10 shrink-0" />
         </div>
         <div className="flex w-full flex-col items-stretch justify-start">
           {topicItems.map((topic) => (
