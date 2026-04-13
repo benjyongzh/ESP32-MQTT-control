@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <EEPROM.h>
+#include <LiquidCrystal_I2C.h>
 #include <PubSubClient.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
@@ -14,6 +15,9 @@ constexpr int EEPROM_SIZE = 8;
 constexpr uint8_t AHT10_SCL_PIN = 27;
 constexpr uint8_t AHT10_SDA_PIN = 25;
 constexpr uint8_t COMPONENT_INDEX = 1;
+constexpr uint8_t LCD_I2C_ADDRESS = 0x27;
+constexpr uint8_t LCD_COLUMNS = 16;
+constexpr uint8_t LCD_ROWS = 2;
 
 constexpr unsigned long DEFAULT_HEARTBEAT_INTERVAL_SECONDS = 60;
 constexpr unsigned long MIN_HEARTBEAT_INTERVAL_SECONDS = 1;
@@ -39,6 +43,7 @@ const char* mqttPassword = MQTT_PASSWORD;
 WiFiClientSecure wifiClient;
 PubSubClient mqttClient(wifiClient);
 Adafruit_AHTX0 aht;
+LiquidCrystal_I2C lcd(LCD_I2C_ADDRESS, LCD_COLUMNS, LCD_ROWS);
 
 char deviceId[32];
 char topicStatus[96];
@@ -187,6 +192,31 @@ void publishStatus(bool retain = false) {
   publishJson(topicStatus, doc, retain);
 }
 
+void updateLcd(const char* line1, const char* line2) {
+  char paddedLine1[17];
+  char paddedLine2[17];
+  snprintf(paddedLine1, sizeof(paddedLine1), "%-16.16s", line1);
+  snprintf(paddedLine2, sizeof(paddedLine2), "%-16.16s", line2);
+
+  lcd.setCursor(0, 0);
+  lcd.print(paddedLine1);
+  lcd.setCursor(0, 1);
+  lcd.print(paddedLine2);
+}
+
+void updateLcdWithReading() {
+  if (isnan(lastTemperature) || isnan(lastHumidity)) {
+    updateLcd("Sensor read fail", "Check wiring");
+    return;
+  }
+
+  char line1[17];
+  char line2[17];
+  snprintf(line1, sizeof(line1), "Temp:%5.1f C", lastTemperature);
+  snprintf(line2, sizeof(line2), "Hum :%5.1f %%", lastHumidity);
+  updateLcd(line1, line2);
+}
+
 bool readSensor() {
   sensors_event_t humidityEvent;
   sensors_event_t temperatureEvent;
@@ -196,12 +226,14 @@ bool readSensor() {
   if (isnan(temperatureEvent.temperature) ||
       isnan(humidityEvent.relative_humidity)) {
     Serial.println("AHT10 read failed");
+    updateLcdWithReading();
     return false;
   }
 
   lastTemperature = temperatureEvent.temperature;
   lastHumidity = humidityEvent.relative_humidity;
   lastReadingTimestamp = getCurrentTimestamp();
+  updateLcdWithReading();
   return true;
 }
 
@@ -216,6 +248,7 @@ void publishCurrentReading(bool refreshSensor) {
 
 void connectWiFi() {
   Serial.print("Connecting to WiFi...");
+  updateLcd("WiFi connecting", "Please wait...");
   WiFi.begin(ssid, password);
 
   while (WiFi.status() != WL_CONNECTED) {
@@ -226,6 +259,7 @@ void connectWiFi() {
   Serial.println("\nWiFi connected!");
   Serial.print("IP Address: ");
   Serial.println(WiFi.localIP());
+  updateLcd("WiFi connected", WiFi.localIP().toString().c_str());
 }
 
 void syncTime() {
@@ -313,6 +347,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 void connectMQTT() {
   while (!mqttClient.connected()) {
     Serial.println("Attempting MQTT connection...");
+    updateLcd("MQTT connecting", deviceId);
     if (mqttClient.connect(deviceId, mqttUser, mqttPassword)) {
       mqttClient.subscribe(topicConfigSet);
       Serial.print("MQTT subscribed to ");
@@ -324,6 +359,7 @@ void connectMQTT() {
       Serial.print("MQTT subscribed to ");
       Serial.println(topicStatusGet);
       Serial.println("MQTT connected!");
+      updateLcd("MQTT connected", "Syncing state...");
       publishConfig();
       publishHealth();
       if (!isnan(lastTemperature) && !isnan(lastHumidity)) {
@@ -334,19 +370,35 @@ void connectMQTT() {
 
     Serial.print("failed. mqttClientState = ");
     Serial.println(mqttClient.state());
+    updateLcd("MQTT failed", "Retrying...");
     delay(1000);
   }
 }
 
 void setupSensor() {
-  Wire.begin(AHT10_SDA_PIN, AHT10_SCL_PIN);
-
   if (!aht.begin(&Wire)) {
     Serial.println("Failed to initialize AHT10 sensor");
+    lcd.init();
+    lcd.backlight();
+    updateLcd("AHT10 init fail", "Check wiring");
     while (true) {
       delay(1000);
     }
   }
+}
+
+void setupLcd() {
+  lcd.init();
+  lcd.backlight();
+  updateLcd("ESP32 climate", "Starting...");
+}
+
+void setupI2c() {
+  Wire.begin(AHT10_SDA_PIN, AHT10_SCL_PIN);
+  Serial.print("I2C initialized. SDA=");
+  Serial.print(AHT10_SDA_PIN);
+  Serial.print(" SCL=");
+  Serial.println(AHT10_SCL_PIN);
 }
 
 void setup() {
@@ -354,11 +406,15 @@ void setup() {
 
   setDeviceId();
   buildTopics();
+  setupI2c();
+  setupLcd();
   setupSensor();
 
   wifiClient.setInsecure();
 
+  updateLcd("Starting WiFi", deviceId);
   connectWiFi();
+  updateLcd("Syncing time", "Please wait...");
   syncTime();
 
   mqttClient.setServer(mqttServer, mqttPort);
